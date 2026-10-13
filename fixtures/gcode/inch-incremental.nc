@@ -1,0 +1,14 @@
+(Inch, incremental moves)
+G20 G90 G54
+M3 S12000
+G0 Z0.2
+G0 X1 Y1
+G91
+G1 Z-0.3 F10
+G1 X2
+Y1.5
+G2 X1 Y1 I1
+G90
+G0 Z0.2
+M5
+M30

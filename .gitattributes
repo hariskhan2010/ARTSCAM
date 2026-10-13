@@ -3,3 +3,4 @@
 *.zip binary
 *.png binary
 *.jpg binary
+fixtures/gcode/messy-format.nc -text
