@@ -1,0 +1,14 @@
+(Safe: inch program inside the stock)
+G20 G90 G17 G54
+M3 S18000
+G0 Z0.2
+G0 X1 Y1
+G1 Z-0.1 F12
+G1 X10 F80
+G1 Y7
+G2 X9 Y6 I0 J-1
+G1 X1
+G1 Y1
+G0 Z0.2
+M5
+M30

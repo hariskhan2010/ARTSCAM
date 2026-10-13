@@ -1,0 +1,8 @@
+(EXPECT rule=spindle line=5)
+G21 G90 G17 G54
+G0 Z5
+G0 X10 Y10
+G1 Z-2 F300
+G1 X100 F1200
+G0 Z5
+M30

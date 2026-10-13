@@ -6,3 +6,4 @@ export const INTERNAL_UNIT = 'mm';
 export * from './model/units';
 export * from './model/history';
 export * from './gcode/parser';
+export * from './gcode/checker';

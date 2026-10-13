@@ -1,0 +1,5 @@
+(EXPECT rule=empty line=0)
+G21 G90 G17 G54
+M3 S18000
+M5
+M30

@@ -1,0 +1,23 @@
+(Safe: outside profile of the full stock with a 12.7 mm tool, inside 10 mm clearance)
+G21 G90 G17 G54
+M3 S18000
+G0 Z5
+G0 X-6.35 Y-6.35
+G1 Z-6 F300
+G1 X306.35 F2000
+G1 Y206.35
+G1 X-6.35
+G1 Y-6.35
+G1 Z-12 F300
+G1 X306.35 F2000
+G1 Y206.35
+G1 X-6.35
+G1 Y-6.35
+G1 Z-18 F300
+G1 X306.35 F2000
+G1 Y206.35
+G1 X-6.35
+G1 Y-6.35
+G0 Z5
+M5
+M30
