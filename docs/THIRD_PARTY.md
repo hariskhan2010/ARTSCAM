@@ -9,6 +9,8 @@ Licences were read from each package's `package.json` after install.
 |---|---|---|---|
 | react | MIT | app | T0.1 |
 | react-dom | MIT | app | T0.1 |
+| zod | MIT | core: project schema validation | T0.2 |
+| fflate | MIT | core: project .zip read/write | T0.2 |
 
 ## Development only (not shipped)
 

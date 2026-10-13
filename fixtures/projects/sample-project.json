@@ -1,0 +1,53 @@
+{
+  "format": "naqsh-project",
+  "version": "0.1",
+  "units": "mm",
+  "stock": { "width": 300, "height": 200, "thickness": 18, "origin": "bottom-left", "zZero": "top" },
+  "layers": [{ "id": "L1", "name": "Design", "visible": true, "locked": false }],
+  "vectors": [
+    {
+      "id": "v1",
+      "layer": "L1",
+      "closed": true,
+      "segments": [
+        { "type": "move", "p": [10, 10] },
+        { "type": "line", "p": [110, 10] },
+        { "type": "cubic", "c1": [120, 40], "c2": [120, 60], "p": [110, 90] },
+        { "type": "close" }
+      ]
+    }
+  ],
+  "reliefs": [
+    {
+      "id": "r1",
+      "resolution": 0.2,
+      "cols": 1500,
+      "rows": 1000,
+      "data": "reliefs/r1.f32",
+      "ops": [{ "op": "fromVector", "vector": "v1", "profile": "dome", "height": 6, "mode": "add" }]
+    }
+  ],
+  "tools": [
+    {
+      "id": "t1",
+      "type": "vbit",
+      "diameter": 12.7,
+      "angle": 90,
+      "stepDown": 2,
+      "stepOver": 0.4,
+      "feed": 1200,
+      "plunge": 300,
+      "rpm": 18000
+    }
+  ],
+  "toolpaths": [
+    {
+      "id": "tp1",
+      "type": "profile",
+      "tool": "t1",
+      "vectors": ["v1"],
+      "params": { "side": "outside", "depth": 6, "tabs": { "count": 4, "width": 6, "height": 2 } }
+    }
+  ],
+  "machine": { "post": "grbl", "travel": [800, 800, 100], "maxFeed": 5000, "safeZ": 5 }
+}

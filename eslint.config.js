@@ -43,4 +43,9 @@ export default tseslint.config(
     files: ['*.js', '*.config.{js,ts}', 'packages/*/*.config.{js,ts}'],
     languageOptions: { globals: { ...globals.node } },
   },
+  {
+    // Tests index into known fixtures; a failed `!` shows up as a test failure anyway.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
 );
