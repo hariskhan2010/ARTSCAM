@@ -1,0 +1,22 @@
+{
+  "name": "@naqsh/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UI-free document model, geometry, CAM and G-code safety core",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.4"
+  }
+}
