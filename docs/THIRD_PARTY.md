@@ -11,6 +11,7 @@ Licences were read from each package's `package.json` after install.
 | react-dom | MIT | app | T0.1 |
 | zod | MIT | core: project schema validation | T0.2 |
 | fflate | MIT | core: project .zip read/write | T0.2 |
+| clipper2-ts | BSL-1.0 | core: polygon offsets and booleans (Clipper2 port). `clipper2-js` 1.2.4 was tried first and rejected: it returns wrong offsets and unions | T1.3 |
 
 ## Development only (not shipped)
 
