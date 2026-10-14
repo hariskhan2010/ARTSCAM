@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- 300 x 200 mm sign; 10 user units per mm. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="300mm" height="200mm" viewBox="0 0 3000 2000">
+  <defs><rect id="unused" width="5" height="5"/></defs>
+  <rect id="border" x="100" y="100" width="2800" height="1800" rx="100"/>
+  <circle id="medallion" cx="1500" cy="1000" r="500"/>
+  <g transform="translate(300,300)">
+    <path id="plate" d="M0 0 h400 v200 h-400 z"/>
+  </g>
+  <path id="arch" d="M 2000 1500 a 200 200 0 0 1 400 0"/>
+  <polygon id="tri" points="2500,300 2700,300 2600,500"/>
+  <line x1="0" y1="0" x2="10" y2="10" style="display:none"/>
+  <text x="10" y="10">Bismillah</text>
+</svg>
