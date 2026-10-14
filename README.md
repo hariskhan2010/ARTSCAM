@@ -17,6 +17,14 @@ See `plan.md` for the full spec and `CLAUDE.md` for working rules.
 
 ## Using it
 
+The window is laid out where ex-ArtCAM users expect things (with our own icons and colours): a menu bar
+(File, Edit, View, Model, Vector, Bitmap, Relief, Toolpath, 3D Printing, Window, Help); two toolbar rows
+(file, clipboard, undo, vector editing; then zoom, relief and toolpath tools); the drawing tools on the
+left; **2D View / 3D View** tabs with a zoom bar and rulers above the canvas; the **Project** tree
+(Vectors, Bitmaps, Front Relief, Toolpaths) with the picked item's settings below it and **Model
+Information** at the bottom right; and X, Y, Z (relief height) and selection W × H in the status bar.
+Menu items for features that aren't built yet are greyed out ("Coming later").
+
 1. **Design**: draw with the tools on the left (V select, N points, P pen, L line, T text, R rectangle, E ellipse, G polygon, S star, H pan), or **Import** an SVG/DXF. Text takes Urdu, Arabic and English; pick Naskh or Nastaliq, or load your own font. Set the material size and units.
 2. **Relief**: create a relief, pick a profile (flat, dome, angle, round) and height, then add the selected shapes, or add a grayscale image. Combine, smooth, scale or invert it; view it in 3D and export STL.
 3. **Toolpaths**: add a tool from the presets, select shapes, then pick **Profile**, **Pocket**, **V-carve** (needs a V-bit), **Drill**, **3D rough** (flat end mill) or **3D finish** (ball nose, on the relief). Adjust depth, tabs, ramp and so on.

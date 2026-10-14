@@ -101,57 +101,34 @@ h3 {
 
 .app {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 340px;
-  grid-template-rows: 48px minmax(0, 1fr) 26px;
+  grid-template-columns: 40px minmax(0, 1fr) 300px;
+  grid-template-rows: 28px 34px 34px minmax(0, 1fr) 24px;
   grid-template-areas:
-    'top top top'
+    'menu menu menu'
+    'tb1 tb1 tb1'
+    'tb2 tb2 tb2'
     'tools stage side'
     'status status status';
   height: 100%;
 }
 
-.topbar {
-  grid-area: top;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 650;
-  font-size: 14px;
-  margin-right: 8px;
+  font-size: 13px;
+  margin: 0 8px 0 2px;
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
   background: var(--accent);
   color: var(--accent-text);
-}
-
-.brand small {
-  font-weight: 500;
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border);
-  margin: 0 4px;
 }
 
 /* ---------- Buttons ---------- */
@@ -219,13 +196,12 @@ h3 {
 }
 
 .btn:focus-visible,
-.tool:focus-visible,
 .segmented button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-/* ---------- Tool palette ---------- */
+/* ---------- Tool strip ---------- */
 
 .toolbox {
   grid-area: tools;
@@ -237,68 +213,6 @@ h3 {
   background: var(--panel);
   border-right: 1px solid var(--border);
   overflow-y: auto;
-}
-
-.toolbox hr {
-  width: 26px;
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 6px 0;
-}
-
-.tool {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.tool:hover {
-  color: var(--text);
-  background: var(--panel-2);
-}
-
-.tool.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.tool kbd {
-  position: absolute;
-  right: 2px;
-  bottom: 1px;
-  font:
-    600 8px/1 system-ui,
-    sans-serif;
-  color: var(--faint);
-}
-
-/* Tooltips for elements with data-tip (tool palette). */
-[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: #1b2230;
-  color: #fff;
-  font:
-    500 12px/1.3 system-ui,
-    sans-serif;
-  white-space: nowrap;
-  pointer-events: none;
-  box-shadow: var(--shadow);
 }
 
 /* ---------- Canvas stage ---------- */
@@ -330,52 +244,6 @@ h3 {
   box-shadow: var(--shadow);
 }
 
-.tool-hint {
-  top: 10px;
-  left: 10px;
-  max-width: min(520px, calc(100% - 20px));
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tool-hint .title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-}
-
-.tool-hint .keys {
-  color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-
-.tool-hint .keys kbd {
-  font:
-    600 11px system-ui,
-    sans-serif;
-  padding: 1px 5px;
-  border: 1px solid var(--border-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  color: var(--text);
-  background: var(--panel-2);
-}
-
-.tool-hint .row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tool-hint .input {
-  width: 90px;
-}
-
 .text-editor {
   display: flex;
   flex-direction: column;
@@ -404,22 +272,6 @@ h3 {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-.view-controls {
-  right: 10px;
-  bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-}
-
-.view-controls .zoom {
-  min-width: 46px;
-  text-align: center;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ---------- Sidebar ---------- */
 
 .sidebar {
@@ -429,50 +281,6 @@ h3 {
   min-height: 0;
   background: var(--panel);
   border-left: 1px solid var(--border);
-}
-
-.steps {
-  display: flex;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.steps button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 34px;
-  font: inherit;
-  font-weight: 600;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.steps button .num {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  font-size: 11px;
-  border: 1.5px solid currentColor;
-}
-
-.steps button.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.steps button.active .num {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
 }
 
 .sidebar-scroll {
@@ -996,10 +804,12 @@ details.panel:not([open]) .chevron {
 
 @media (max-width: 760px) {
   .app {
-    grid-template-columns: 52px minmax(0, 1fr);
-    grid-template-rows: 48px minmax(0, 1fr) 45vh 26px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-rows: 28px 34px 34px minmax(0, 1fr) 45vh 24px;
     grid-template-areas:
-      'top top'
+      'menu menu'
+      'tb1 tb1'
+      'tb2 tb2'
       'tools stage'
       'side side'
       'status status';
@@ -1008,10 +818,6 @@ details.panel:not([open]) .chevron {
   .sidebar {
     border-left: none;
     border-top: 1px solid var(--border);
-  }
-
-  .topbar .label-text {
-    display: none;
   }
 }
 
@@ -1037,4 +843,468 @@ details.panel:not([open]) .chevron {
   gap: 10px;
   padding: 4px 4px 4px 12px;
   font-size: 12px;
+}
+
+.relief-3d.empty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+/* ---------- Menu bar ---------- */
+
+.menubar {
+  grid-area: menu;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 6px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: relative;
+  z-index: 40;
+}
+
+.menu {
+  position: relative;
+}
+
+.menu-title {
+  height: 24px;
+  padding: 0 9px;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.menu-title:hover,
+.menu-title.open {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.menu-pop {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 230px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.menu-pop hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 2px;
+}
+
+.menu-item {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 4px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(.off),
+.menu-item:focus-visible {
+  background: var(--accent);
+  color: var(--accent-text);
+  outline: none;
+}
+
+.menu-item.off {
+  color: var(--faint);
+  cursor: default;
+}
+
+.menu-item .check {
+  font-size: 12px;
+  text-align: center;
+}
+
+.menu-item .shortcut {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.menu-item:hover:not(.off) .shortcut {
+  color: inherit;
+}
+
+/* ---------- Toolbars and icon buttons ---------- */
+
+.iconbar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.toolbar-row {
+  padding: 0 6px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.app > .toolbar-row:nth-child(2) {
+  grid-area: tb1;
+}
+
+.app > .toolbar-row:nth-child(3) {
+  grid-area: tb2;
+}
+
+.iconbar .sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 5px;
+  background: var(--border-strong);
+}
+
+.iconbar.vertical .sep {
+  width: 22px;
+  height: 1px;
+  margin: 4px 0;
+}
+
+.icon-btn {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.icon-btn:hover:not(.off) {
+  background: var(--panel-2);
+  border-color: var(--border-strong);
+}
+
+.icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.icon-btn.off {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.icon-btn kbd {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font:
+    600 7px/1 system-ui,
+    sans-serif;
+  color: var(--faint);
+}
+
+.toolbox.iconbar {
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 0;
+  overflow-x: hidden;
+}
+
+.toolbox .icon-btn {
+  width: 32px;
+  height: 30px;
+}
+
+/* ---------- Stage: view tabs, zoom bar, rulers ---------- */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 6px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+.view-tabs {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.view-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 27px;
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  cursor: pointer;
+}
+
+.view-tabs button.active {
+  color: var(--accent);
+  background: var(--canvas-bg);
+  border-color: var(--border-strong);
+}
+
+.stage-bar .zoom {
+  min-width: 42px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-rows: 20px minmax(0, 1fr);
+}
+
+.ruler-corner {
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.ruler {
+  display: block;
+  overflow: hidden;
+}
+
+.ruler-top {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: 100%;
+}
+
+.ruler-left {
+  grid-column: 1;
+  grid-row: 2;
+  max-height: 100%;
+}
+
+.canvas-wrap {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Right side: project tree, panel, model information ---------- */
+
+.project-tree {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 4px;
+}
+
+.tree-head,
+.mi-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-weight: 650;
+  font-size: 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.project-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding-right: 4px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-row:hover:not(.off) {
+  background: var(--panel-2);
+}
+
+.tree-row.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tree-row.child {
+  font-size: 12px;
+}
+
+.tree-row.off {
+  color: var(--faint);
+  cursor: default;
+}
+
+.tree-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tree-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-row .chip {
+  height: 16px;
+  font-size: 10px;
+}
+
+.tree-add {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tree-add:hover {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.panel-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.model-info {
+  flex: none;
+  border-top: 1px solid var(--border-strong);
+  font-size: 12px;
+}
+
+.model-info dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 10px;
+  margin: 0;
+  padding: 4px 8px 6px;
+}
+
+.model-info dt {
+  color: var(--muted);
+}
+
+.model-info dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Short windows (e.g. 1366 Ã— 551 laptops with the browser bars): tighter strip. */
+@media (max-height: 640px) {
+  .toolbox .icon-btn {
+    height: 24px;
+  }
+
+  .iconbar.vertical .sep {
+    margin: 2px 0;
+  }
+
+  .toolbox.iconbar {
+    padding: 2px 0;
+  }
+
+  .model-info dl {
+    padding: 2px 8px 3px;
+  }
+
+  .tree-row {
+    height: 19px;
+  }
+
+  .tree-head,
+  .mi-head {
+    padding: 3px 8px;
+  }
 }

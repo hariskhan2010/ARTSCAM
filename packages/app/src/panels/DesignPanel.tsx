@@ -1,14 +1,9 @@
 import {
   addLayer,
-  addVectors,
-  booleanOp,
-  composite,
   deleteLayer,
   deleteVectors,
   duplicateVectors,
-  flatten,
   moveVectorsToLayer,
-  offset,
   rotation,
   scaling,
   setStock,
@@ -18,9 +13,6 @@ import {
   updateLayer,
   type BooleanOp,
   type Project,
-  type Segment,
-  type Vec2,
-  type Vector,
 } from '@naqsh/core';
 import {
   ArrowLeftRight,
@@ -46,33 +38,7 @@ import { useState } from 'react';
 import { selectionBBox } from '../editor/geometry';
 import type { EditorStore } from '../editor/store';
 import { Btn, Hint, NumberField, Section, SelectField } from './common';
-
-/** Flattening tolerance for booleans/offsets (mm). */
-const GEOM_TOL = 0.01;
-
-/** Closed rings of the given vectors (open vectors are ignored). */
-function ringsOf(vectors: readonly Vector[]): Vec2[][] {
-  return vectors
-    .filter((v) => v.closed)
-    .flatMap((v) => flatten(v.segments, GEOM_TOL, true).map((p) => p.points));
-}
-
-/** One vector holding all rings of a region (outer + holes stay together). */
-function regionVector(rings: Vec2[][], layer: string): Omit<Vector, 'id'> | undefined {
-  const segments: Segment[] = [];
-  for (const ring of rings) {
-    ring.forEach((p, i) => segments.push({ type: i === 0 ? 'move' : 'line', p: [p[0], p[1]] }));
-    segments.push({ type: 'close' });
-  }
-  return segments.length ? { layer, closed: true, segments } : undefined;
-}
-
-/** Selected vectors in the order they were picked (Trim/Intersect use the first as subject). */
-function selectedVectors(store: EditorStore): Vector[] {
-  return store.ui.selection
-    .map((id) => store.doc.vectors.find((v) => v.id === id))
-    .filter((v): v is Vector => !!v);
-}
+import { booleanSelection, offsetSelection, selectedVectors } from '../actions';
 
 function SelectionSection({ store }: { store: EditorStore }) {
   const doc = store.doc;
@@ -231,37 +197,8 @@ function ShapeOpsSection({ store }: { store: EditorStore }) {
   const closed = selectedVectors(store).filter((v) => v.closed);
   const [offsetBy, setOffsetBy] = useState(2);
 
-  const boolean = (op: BooleanOp, label: string) => {
-    const [first, ...rest] = closed;
-    if (!first || rest.length === 0) {
-      store.setUi({ message: `${label} needs two or more closed shapes selected` });
-      return;
-    }
-    const result =
-      op === 'union'
-        ? booleanOp('union', ringsOf(closed), [], 'nonZero')
-        : booleanOp(op, ringsOf([first]), ringsOf(rest));
-    const vec = regionVector(result, first.layer);
-    store.execute(
-      composite(label, [
-        deleteVectors(closed.map((v) => v.id)),
-        ...(vec ? [addVectors([vec], label)] : []),
-      ]),
-    );
-    const last = store.doc.vectors.at(-1);
-    store.select(vec && last ? [last.id] : []);
-  };
-
-  const doOffset = (sign: 1 | -1) => {
-    const vecs = closed
-      .map((v) => regionVector(offset(ringsOf([v]), sign * offsetBy), v.layer))
-      .filter((v): v is Omit<Vector, 'id'> => !!v);
-    if (vecs.length === 0) {
-      store.setUi({ message: 'The inset is larger than the shape, so nothing is left' });
-      return;
-    }
-    store.execute(addVectors(vecs, sign > 0 ? 'Offset outward' : 'Offset inward'));
-  };
+  const boolean = (op: BooleanOp, label: string) => booleanSelection(store, op, label);
+  const doOffset = (sign: 1 | -1) => offsetSelection(store, sign, offsetBy);
 
   return (
     <Section title="Shape operations" icon={Combine} collapsible>

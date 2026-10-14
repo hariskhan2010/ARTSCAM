@@ -25,7 +25,6 @@ import { CanvasOverlay } from './CanvasOverlay';
 import {
   anchorPoints,
   boxFrom,
-  fitView,
   gridStep,
   handlePositions,
   handleTransform,
@@ -53,6 +52,8 @@ import {
 import type { CamRunner } from '../cam/runner';
 import type { SimResult } from '../cam/protocol';
 import { useStore, type EditorStore } from './store';
+import { currentView } from './viewActions';
+import { copySelection, cutSelection, pasteClipboard } from '../actions';
 
 /** Hit radius in screen pixels. */
 const HIT_PX = 6;
@@ -63,9 +64,6 @@ const HIT_PX = 6;
 const POINT_HIT_PX = 10;
 const HANDLE_PX = 4;
 const ROTATE_PX = 24;
-/** Fit-view margins (px); the top one leaves room for the tool hint card. */
-const FIT_MARGIN = 40;
-const FIT_TOP = 120;
 
 /** What the current pointer drag is doing. */
 type Drag =
@@ -267,23 +265,11 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
   const lastFontRef = useRef('naskh');
   const lastSizeRef = useRef(30);
   const [penCount, setPenCount] = useState(0);
-  /** Canvas size in CSS px, as state so the zoom readout re-renders on resize. */
-  const [size, setSize] = useState<[number, number]>([800, 600]);
   const sizeRef = useRef<[number, number]>([800, 600]);
 
   const ui = store.ui;
 
-  const view = (): View => {
-    if (store.ui.view) return store.ui.view;
-    const [w, h] = sizeRef.current;
-    return fitView(
-      { minX: 0, minY: 0, maxX: store.doc.stock.width, maxY: store.doc.stock.height },
-      w,
-      h,
-      FIT_MARGIN,
-      FIT_TOP,
-    );
-  };
+  const view = (): View => currentView(store);
 
   const visibleVectors = (): Vector[] => {
     const shown = new Set(store.doc.layers.filter((l) => l.visible).map((l) => l.id));
@@ -572,14 +558,15 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       const r = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
       sizeRef.current = [r.width, r.height];
-      setSize([r.width, r.height]);
+      store.canvasSize = [r.width, r.height];
+      store.touch(); // rulers and the zoom readout depend on the canvas size
       canvas.width = Math.round(r.width * dpr);
       canvas.height = Math.round(r.height * dpr);
       draw();
     });
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [draw]);
+  }, [draw, store]);
 
   const toWorld = (e: { clientX: number; clientY: number }): [number, number] => {
     const r = (canvasRef.current as HTMLCanvasElement).getBoundingClientRect();
@@ -948,6 +935,13 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         store.redo();
         return;
       }
+      if (mod && (key === 'c' || key === 'x' || key === 'v')) {
+        e.preventDefault();
+        if (key === 'c') copySelection(store);
+        else if (key === 'x') cutSelection(store);
+        else pasteClipboard(store);
+        return;
+      }
       if (mod && key === 'a') {
         e.preventDefault();
         store.select(editableVectors().map((v) => v.id));
@@ -1065,19 +1059,6 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
   };
 
   const cursor = ui.tool === 'pan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
-  const zoomBy = (factor: number) => {
-    const [w, h] = sizeRef.current;
-    store.setUi({ view: zoomAt(view(), [w / 2, h / 2], factor) });
-  };
-  const [w0, h0] = size;
-  const fitScale = fitView(
-    { minX: 0, minY: 0, maxX: store.doc.stock.width, maxY: store.doc.stock.height },
-    w0,
-    h0,
-    FIT_MARGIN,
-    FIT_TOP,
-  ).scale;
-
   return (
     <>
       <canvas
@@ -1110,8 +1091,6 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         penCount={penCount}
         onFinishPen={finishPen}
         onCancelPen={cancelPen}
-        zoomPercent={Math.round(((store.ui.view?.scale ?? fitScale) / fitScale) * 100)}
-        onZoom={zoomBy}
       />
     </>
   );

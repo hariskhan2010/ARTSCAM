@@ -9,12 +9,13 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **M2** 2D CAM: tool library, profile (tabs, ramps), pocket (offset/raster, islands), drill/peck, GRBL post, stock simulation, time estimate, export blocked until simulated and checked.
 - **M3** Text (Urdu/Arabic/Latin via HarfBuzz; Naskh and Nastaliq bundled; own fonts) and V-carve.
 - UI redesign: icons, tool hints, clearer panels.
+- ArtCAM-style layout (positions and order only; own icons, colours and name): menu bar, two toolbar rows, left tool strip, 2D/3D View tabs with a zoom bar, rulers (mm/inch), Project tree with the item's panel below, Model Information, status bar with X Y Z and W H. Cut/copy/paste, zoom previous and zoom to selection added. Placeholders (array, eraser, fill, arc, sculpt, clipart, back relief, sheets, sweeps…) are disabled with "Coming later".
 - Mach3, LinuxCNC and generic G-code output (same safe subset as GRBL, plus a G40 G49 G80 safety line; LinuxCNC files wrapped in %).
 - DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
 - Offline mode (PWA): installable; after one visit the whole app, including fonts and text shaping, works with no server. Tested by shutting the server down.
 - **M4** Relief engine: relief grid covering the material; shape → flat/dome/angle/round with base height; combine add/subtract/merge high/merge low/zero; smooth, scale, offset, invert; image → relief (placement, height, invert, blur), images stored in the project zip; watertight binary STL export; Relief panel, canvas shading and a Three.js 3D view.
 - **M5** 3D CAM: relief placed with its top at the top of the material; drop-cutter for flat, ball, V and tapered tools (fast row-skipping scan, same result as a full scan); raster finishing (X, Y, X then Y) with a ball nose; Z-level roughing with an allowance; both in the Toolpaths panel with simulation, time estimate and checked export.
-- Checks: `pnpm run ci` (lint, typecheck, 341 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (15 browser tests on dev; 16 on the production build, including offline).
+- Checks: `pnpm run ci` (lint, typecheck, 348 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
 
 ## Blocked: needs you
 

@@ -8,6 +8,8 @@ import {
   type Project,
   type Segment,
   type TextAlign,
+  type Vector,
+  type ReliefOp,
 } from '@naqsh/core';
 import { useSyncExternalStore } from 'react';
 import type { View } from './geometry';
@@ -32,12 +34,43 @@ export interface TextDraft {
   align: TextAlign;
 }
 
+type FromVector = Extract<ReliefOp, { op: 'fromVector' }>;
+
+/** Relief tool settings, shared by the Relief panel and the toolbar buttons. */
+export interface ReliefForm {
+  /** Grid spacing (mm) for a new relief. */
+  resolution: number;
+  profile: FromVector['profile'];
+  height: number;
+  angle: number;
+  mode: FromVector['mode'];
+  smoothRadius: number;
+  factor: number;
+  imageHeight: number;
+}
+
+export const DEFAULT_RELIEF_FORM: ReliefForm = {
+  resolution: 0.25,
+  profile: 'dome',
+  height: 5,
+  angle: 45,
+  mode: 'add',
+  smoothRadius: 1,
+  factor: 0.5,
+  imageHeight: 4,
+};
+
+/** What the right-hand panel shows (picked in the Project tree). */
+export type SidebarTab = 'design' | 'bitmaps' | 'relief' | 'cam';
+
 export interface UiState {
   tool: ToolName;
   selection: readonly string[];
   /** Layer new vectors go into. */
   activeLayer: string;
   view: View | undefined;
+  /** The view before the last zoom command (View › Zoom previous). */
+  prevView: View | undefined;
   snapGrid: boolean;
   snapPoints: boolean;
   /** Polygon sides / star points for the shape tools. */
@@ -46,9 +79,11 @@ export interface UiState {
   cursor: [number, number] | undefined;
   /** Short message (import warnings, errors). */
   message: string | undefined;
-  sidebarTab: 'design' | 'relief' | 'cam';
+  sidebarTab: SidebarTab;
+  reliefForm: ReliefForm;
   /** Relief shown in the Relief panel, the canvas and the 3D view. */
   activeRelief: string | undefined;
+  /** The 3D View tab is showing instead of the 2D canvas. */
   show3d: boolean;
   /** Toolpath shown in the CAM panel and previewed on the canvas. */
   activeToolpath: string | undefined;
@@ -63,6 +98,10 @@ export class EditorStore {
   readonly history: History<Project>;
   /** Grayscale images used by image reliefs, by id (immutable, so outside the undo history). */
   images: Record<string, Uint8Array> = {};
+  /** Vectors copied with Edit › Copy / Cut (kept for this session only). */
+  clipboard: Omit<Vector, 'id'>[] = [];
+  /** Size of the 2D canvas in CSS px (kept by the canvas; zoom commands use it). */
+  canvasSize: [number, number] = [800, 600];
   /** Relief grids are derived from their ops; cached by everything they depend on. */
   #reliefCache = new Map<string, { key: string; grid?: Grid; error?: string }>();
   #ui: UiState;
@@ -76,12 +115,14 @@ export class EditorStore {
       selection: [],
       activeLayer: doc.layers[0]?.id ?? 'L1',
       view: undefined,
+      prevView: undefined,
       snapGrid: true,
       snapPoints: true,
       sides: 6,
       cursor: undefined,
       message: undefined,
       sidebarTab: 'design',
+      reliefForm: DEFAULT_RELIEF_FORM,
       activeRelief: undefined,
       show3d: false,
       activeToolpath: undefined,
@@ -129,6 +170,7 @@ export class EditorStore {
       selection: [],
       activeLayer: doc.layers[0]?.id ?? 'L1',
       view: undefined,
+      prevView: undefined,
     };
     this.history.reset(doc);
   }

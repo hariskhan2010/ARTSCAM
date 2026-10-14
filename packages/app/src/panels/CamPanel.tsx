@@ -2,7 +2,6 @@ import {
   AVAILABLE_POSTS,
   TOOL_PRESETS,
   addTool,
-  addToolpath,
   deleteTool,
   deleteToolpath,
   formatDuration,
@@ -33,7 +32,7 @@ import {
 import { useEffect } from 'react';
 import type { CamRunner } from '../cam/runner';
 import type { EditorStore } from '../editor/store';
-import { download } from '../files';
+import { createToolpath, exportGcode } from '../actions';
 import {
   Btn,
   Hint,
@@ -536,67 +535,7 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
     doc.vectors.some((v) => v.id === id),
   ).length;
 
-  const create = (type: Toolpath['type']) => {
-    const vectors = store.ui.selection.filter((id) => doc.vectors.some((v) => v.id === id));
-    const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
-    // V-carving needs a V-bit: use one from the library when the active tool is not.
-    // Each job prefers the tool type it needs when the library has one.
-    const want =
-      type === 'vcarve'
-        ? 'vbit'
-        : type === 'finish3d'
-          ? 'ballnose'
-          : type === 'rough3d'
-            ? 'flat'
-            : undefined;
-    const tool =
-      want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active;
-    const relief = doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? doc.reliefs[0];
-    const is3d = type === 'rough3d' || type === 'finish3d';
-    if (!tool) {
-      store.setUi({ message: 'Add a tool first (Tools section below)' });
-      return;
-    }
-    if (is3d && !relief) {
-      store.setUi({ message: 'Make a relief first (step 2, Relief)' });
-      return;
-    }
-    if (vectors.length === 0 && !is3d) {
-      store.setUi({ message: 'Select the shapes to machine on the canvas first' });
-      return;
-    }
-    const depth = type === 'profile' ? doc.stock.thickness : Math.min(3, doc.stock.thickness);
-    const params =
-      type === 'profile'
-        ? { side: 'outside' as const, depth }
-        : type === 'pocket'
-          ? { depth, strategy: 'offset' as const }
-          : type === 'vcarve'
-            ? { depth: Math.min(6, doc.stock.thickness) }
-            : type === 'rough3d'
-              ? { allowance: 0.5 }
-              : type === 'finish3d'
-                ? { pattern: 'x' as const }
-                : { depth };
-    if (type === 'vcarve' && tool.type !== 'vbit') {
-      store.setUi({
-        message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
-      });
-    }
-    const name = `${TYPE_INFO[type].label} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;
-    store.execute(
-      addToolpath({
-        type,
-        tool: tool.id,
-        // 3D jobs cover the whole relief unless shapes are selected as a boundary (roughing only).
-        vectors: is3d && type === 'finish3d' ? [] : vectors,
-        name,
-        params,
-        ...(is3d && relief ? { relief: relief.id } : {}),
-      } as Parameters<typeof addToolpath>[0]),
-    );
-    store.setUi({ activeToolpath: store.doc.toolpaths.at(-1)?.id });
-  };
+  const create = (type: Toolpath['type']) => createToolpath(store, type);
 
   // Keep the active toolpath's preview current.
   useEffect(() => {
@@ -774,17 +713,7 @@ function RunFooter({ store, runner, tp }: { store: EditorStore; runner: CamRunne
   const issues = (st?.preview?.issues ?? []).filter((i) => i.rule !== 'preview');
   const errors = issues.filter((i) => i.severity === 'error');
 
-  const doExport = async () => {
-    const res = await runner.export(doc, tp.id);
-    if (!res) return;
-    if (res.ok) {
-      download(res.fileName, res.gcode, 'text/plain');
-      store.setUi({ message: `Exported ${res.fileName}: G-code checker passed` });
-    } else {
-      const first = res.issues.find((i) => i.severity === 'error');
-      store.setUi({ message: `Export blocked: ${first?.message ?? 'checker error'}` });
-    }
-  };
+  const doExport = () => exportGcode(store, runner, tp.id);
 
   const status = !st?.preview
     ? undefined

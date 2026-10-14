@@ -2,10 +2,7 @@ import {
   addRelief,
   deleteRelief,
   gridRange,
-  reliefToStl,
   removeReliefOp,
-  setReliefOp,
-  composite,
   type ReliefOp,
   type Vector,
 } from '@naqsh/core';
@@ -20,9 +17,16 @@ import {
   Trash,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
-import type { EditorStore } from '../editor/store';
-import { download, pickFile } from '../files';
+import type { EditorStore, ReliefForm } from '../editor/store';
+import {
+  addImageRelief,
+  exportStl,
+  invertRelief,
+  scaleRelief,
+  setReliefForm,
+  shapesToRelief,
+  smoothRelief,
+} from '../actions';
 import { Btn, Hint, NumberField, Section, Segmented, SelectField } from './common';
 
 type Profile = Extract<ReliefOp, { op: 'fromVector' }>['profile'];
@@ -35,33 +39,6 @@ const MODES: { value: Mode; label: string }[] = [
   { value: 'mergeLow', label: 'Merge low' },
   { value: 'zero', label: 'Zero (flatten)' },
 ];
-
-/** Decodes an image file to grayscale bytes (rows top to bottom), at most `max` px on the long side. */
-async function imageToGray(
-  file: File,
-  max = 1000,
-): Promise<{ px: Uint8Array; w: number; h: number }> {
-  const bmp = await createImageBitmap(file);
-  const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
-  const w = Math.max(1, Math.round(bmp.width * s));
-  const h = Math.max(1, Math.round(bmp.height * s));
-  const canvas = new OffscreenCanvas(w, h);
-  const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
-  ctx.drawImage(bmp, 0, 0, w, h);
-  const rgba = ctx.getImageData(0, 0, w, h).data;
-  const px = new Uint8Array(w * h);
-  for (let i = 0; i < px.length; i++) {
-    const a = (rgba[i * 4 + 3] as number) / 255;
-    // Luminance; transparent pixels count as black (no height).
-    px[i] = Math.round(
-      a *
-        (0.299 * (rgba[i * 4] as number) +
-          0.587 * (rgba[i * 4 + 1] as number) +
-          0.114 * (rgba[i * 4 + 2] as number)),
-    );
-  }
-  return { px, w, h };
-}
 
 function describe(op: ReliefOp, vectors: Vector[]): string {
   switch (op.op) {
@@ -86,14 +63,9 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
   const doc = store.doc;
   const u = doc.units;
   const relief = doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? doc.reliefs[0];
-  const [resolution, setResolution] = useState(0.25);
-  const [profile, setProfile] = useState<Profile>('dome');
-  const [height, setHeight] = useState(5);
-  const [angle, setAngle] = useState(45);
-  const [mode, setMode] = useState<Mode>('add');
-  const [smoothR, setSmoothR] = useState(1);
-  const [factor, setFactor] = useState(0.5);
-  const [imgHeight, setImgHeight] = useState(4);
+  const f = store.ui.reliefForm;
+  const set = (patch: Partial<ReliefForm>) => setReliefForm(store, patch);
+  const { resolution, profile, height, angle, mode, factor } = f;
 
   if (!relief) {
     return (
@@ -111,7 +83,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
               { value: '0.25', label: '0.25 mm: balanced' },
               { value: '0.15', label: '0.15 mm: fine (slower)' },
             ]}
-            onChange={(v) => setResolution(Number(v))}
+            onChange={(v) => set({ resolution: Number(v) })}
           />
           <Btn
             icon={Plus}
@@ -134,56 +106,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
     .map((id) => doc.vectors.find((v) => v.id === id))
     .filter((v): v is Vector => !!v && v.closed);
 
-  const addShapes = () => {
-    if (closed.length === 0) {
-      store.setUi({ message: 'Select closed shapes on the canvas first' });
-      return;
-    }
-    store.execute(
-      composite(
-        'Shapes to relief',
-        closed.map((v) =>
-          setReliefOp(relief.id, {
-            op: 'fromVector',
-            vector: v.id,
-            profile,
-            height,
-            ...(profile === 'angle' ? { angle } : {}),
-            mode,
-          }),
-        ),
-      ),
-    );
-  };
-
-  const addImage = async () => {
-    const file = await pickFile('image/*');
-    if (!file) return;
-    try {
-      const { px, w, h } = await imageToGray(file);
-      const id = store.addImage(px);
-      // Fit the image inside the material, keeping its aspect ratio, centred.
-      const s = Math.min(doc.stock.width / w, doc.stock.height / h);
-      const W = w * s;
-      const H = h * s;
-      store.execute(
-        setReliefOp(relief.id, {
-          op: 'fromImage',
-          image: id,
-          px: w,
-          py: h,
-          x: (doc.stock.width - W) / 2,
-          y: (doc.stock.height - H) / 2,
-          w: W,
-          h: H,
-          height: imgHeight,
-          mode,
-        }),
-      );
-    } catch (e) {
-      store.setUi({ message: `Could not read the image: ${(e as Error).message}` });
-    }
-  };
+  const addShapes = () => shapesToRelief(store);
 
   return (
     <div className="sidebar-scroll">
@@ -222,7 +145,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
             icon={Download}
             label="Export STL"
             disabled={!grid}
-            onClick={() => grid && download('relief.stl', reliefToStl(grid), 'model/stl')}
+            onClick={() => exportStl(store)}
             testId="relief-stl"
             wide
           />
@@ -243,7 +166,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
             },
             { value: 'round', label: 'Round', help: 'Rounded edge, flat on top' },
           ]}
-          onChange={setProfile}
+          onChange={(profile) => set({ profile })}
           testId="relief-profile"
         />
         <div className="grid2">
@@ -251,13 +174,24 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
             label="Height"
             units={u}
             value={height}
-            onCommit={setHeight}
+            onCommit={(height) => set({ height })}
             testId="relief-height"
           />
           {profile === 'angle' && (
-            <NumberField label="Angle" suffix="°" min={1} value={angle} onCommit={setAngle} />
+            <NumberField
+              label="Angle"
+              suffix="°"
+              min={1}
+              value={angle}
+              onCommit={(angle) => set({ angle })}
+            />
           )}
-          <SelectField label="Combine" value={mode} options={MODES} onChange={setMode} />
+          <SelectField
+            label="Combine"
+            value={mode}
+            options={MODES}
+            onChange={(mode) => set({ mode })}
+          />
         </div>
         <Btn
           icon={Plus}
@@ -272,11 +206,16 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
           testId="relief-add-shapes"
         />
         <div className="row">
-          <NumberField label="Image height" units={u} value={imgHeight} onCommit={setImgHeight} />
+          <NumberField
+            label="Image height"
+            units={u}
+            value={f.imageHeight}
+            onCommit={(imageHeight) => set({ imageHeight })}
+          />
           <Btn
             icon={ImageIcon}
             label="Add image…"
-            onClick={() => void addImage()}
+            onClick={() => void addImageRelief(store)}
             title="Bright parts become high"
           />
         </div>
@@ -288,27 +227,20 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
             label="Smooth radius"
             units={u}
             min={0.01}
-            value={smoothR}
-            onCommit={setSmoothR}
+            value={f.smoothRadius}
+            onCommit={(smoothRadius) => set({ smoothRadius })}
           />
-          <Btn
-            label="Smooth"
-            onClick={() =>
-              store.execute(setReliefOp(relief.id, { op: 'smooth', radius: smoothR, passes: 3 }))
-            }
-          />
+          <Btn label="Smooth" onClick={() => smoothRelief(store)} />
         </div>
         <div className="row">
-          <NumberField label="Height factor" value={factor} onCommit={setFactor} />
-          <Btn
-            label="Scale"
-            onClick={() => store.execute(setReliefOp(relief.id, { op: 'scale', factor }))}
+          <NumberField
+            label="Height factor"
+            value={factor}
+            onCommit={(factor) => set({ factor })}
           />
+          <Btn label="Scale" onClick={() => scaleRelief(store)} />
         </div>
-        <Btn
-          label="Invert (flip high and low)"
-          onClick={() => store.execute(setReliefOp(relief.id, { op: 'invert' }))}
-        />
+        <Btn label="Invert (flip high and low)" onClick={() => invertRelief(store)} />
       </Section>
 
       <Section title={`Steps (${relief.ops.length})`} icon={Layers}>

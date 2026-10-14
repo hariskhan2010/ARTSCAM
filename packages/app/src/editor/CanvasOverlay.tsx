@@ -3,8 +3,6 @@ import {
   Circle,
   Hand,
   Hexagon,
-  Magnet,
-  Maximize,
   MousePointer2,
   PenTool,
   Slash,
@@ -14,8 +12,6 @@ import {
   Type,
   Waypoints,
   X,
-  ZoomIn,
-  ZoomOut,
   type LucideIcon,
 } from 'lucide-react';
 import { Btn } from '../panels/common';
@@ -87,8 +83,6 @@ export function CanvasOverlay(props: {
   penCount: number;
   onFinishPen: (closed: boolean) => void;
   onCancelPen: () => void;
-  zoomPercent: number;
-  onZoom: (factor: number) => void;
 }) {
   const store = useStore(props.store);
   const { ui } = store;
@@ -169,42 +163,6 @@ export function CanvasOverlay(props: {
             />
           </div>
         )}
-      </div>
-
-      <div className="float view-controls" aria-label="View">
-        <Btn
-          icon={ZoomOut}
-          title="Zoom out"
-          variant="ghost"
-          onClick={() => props.onZoom(1 / 1.25)}
-        />
-        <span className="zoom" data-testid="zoom">
-          {props.zoomPercent}%
-        </span>
-        <Btn icon={ZoomIn} title="Zoom in" variant="ghost" onClick={() => props.onZoom(1.25)} />
-        <Btn
-          icon={Maximize}
-          title="Fit the material in view"
-          variant="ghost"
-          onClick={() => store.setUi({ view: undefined })}
-        />
-        <span className="divider" />
-        <Btn
-          icon={Magnet}
-          title={ui.snapGrid ? 'Grid snapping on' : 'Grid snapping off'}
-          variant="ghost"
-          pressed={ui.snapGrid}
-          onClick={() => store.setUi({ snapGrid: !ui.snapGrid })}
-          testId="snap-grid"
-        />
-        <Btn
-          icon={Waypoints}
-          title={ui.snapPoints ? 'Snap to points on' : 'Snap to points off'}
-          variant="ghost"
-          pressed={ui.snapPoints}
-          onClick={() => store.setUi({ snapPoints: !ui.snapPoints })}
-          testId="snap-points"
-        />
       </div>
     </>
   );

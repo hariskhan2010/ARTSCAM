@@ -1,0 +1,505 @@
+import {
+  addRelief,
+  addToolpath,
+  addVectors,
+  booleanOp,
+  composite,
+  deleteVectors,
+  duplicateVectors,
+  exportDxf,
+  exportSvg,
+  flatten,
+  importDxf,
+  importSvg,
+  loadProject,
+  newProject,
+  offset,
+  reliefToStl,
+  rotation,
+  saveProject,
+  scaling,
+  setReliefOp,
+  transformSegments,
+  transformVectors,
+  translation,
+  type BooleanOp,
+  type Relief,
+  type ReliefOp,
+  type Segment,
+  type Toolpath,
+  type Vec2,
+  type Vector,
+} from '@naqsh/core';
+import type { CamRunner } from './cam/runner';
+import type { EditorStore, ReliefForm } from './editor/store';
+import { download, pickFile } from './files';
+
+/**
+ * Every user action the menus, toolbars and panels share. Each one goes
+ * through the store's commands (undo/redo) and reports problems in the
+ * status bar message instead of throwing.
+ */
+
+// --- File ---------------------------------------------------------------------
+
+export function confirmNew(store: EditorStore) {
+  if (
+    store.doc.vectors.length > 0 &&
+    !window.confirm('Start a new project? Unsaved changes are lost.')
+  )
+    return;
+  store.load(newProject());
+}
+
+export async function openProject(store: EditorStore) {
+  const file = await pickFile('.zip,.naqsh');
+  if (!file) return;
+  try {
+    const { project, images } = loadProject(new Uint8Array(await file.arrayBuffer()));
+    store.load(project, images);
+    store.setUi({ message: `Opened ${file.name}` });
+  } catch (e) {
+    store.setUi({ message: (e as Error).message });
+  }
+}
+
+export function saveProjectFile(store: EditorStore) {
+  try {
+    const bytes = saveProject(store.bundle());
+    download('project.naqsh.zip', bytes, 'application/zip');
+  } catch (e) {
+    store.setUi({ message: (e as Error).message });
+  }
+}
+
+export async function importVectors(store: EditorStore) {
+  const file = await pickFile('.svg,.dxf');
+  if (!file) return;
+  const text = await file.text();
+  try {
+    const layer = store.ui.activeLayer;
+    const isDxf = file.name.toLowerCase().endsWith('.dxf');
+    const result = isDxf ? importDxf(text) : importSvg(text);
+    const vectors = result.vectors.map((v) => ({ layer, closed: v.closed, segments: v.segments }));
+    const before = new Set(store.doc.vectors.map((v) => v.id));
+    store.execute(addVectors(vectors, `Import ${file.name}`));
+    store.select(store.doc.vectors.filter((v) => !before.has(v.id)).map((v) => v.id));
+    const warn = result.warnings.length ? ` — ${result.warnings.join('; ')}` : '';
+    store.setUi({ message: `Imported ${vectors.length} vectors from ${file.name}${warn}` });
+  } catch (e) {
+    store.setUi({ message: `Import failed: ${(e as Error).message}` });
+  }
+}
+
+export function exportSvgFile(store: EditorStore) {
+  const { doc } = store;
+  const visible = new Set(doc.layers.filter((l) => l.visible).map((l) => l.id));
+  const text = exportSvg(
+    doc.vectors.filter((v) => visible.has(v.layer)),
+    { width: doc.stock.width, height: doc.stock.height },
+  );
+  download('design.svg', text, 'image/svg+xml');
+}
+
+export function exportDxfFile(store: EditorStore) {
+  const { doc } = store;
+  const layers = new Map(doc.layers.filter((l) => l.visible).map((l) => [l.id, l.name]));
+  const text = exportDxf(
+    doc.vectors
+      .filter((v) => layers.has(v.layer))
+      .map((v) => ({ segments: v.segments, closed: v.closed, layer: layers.get(v.layer) ?? '0' })),
+  );
+  download('design.dxf', text, 'application/dxf');
+}
+
+// --- Edit ---------------------------------------------------------------------
+
+/** Selected vectors in the order they were picked (Trim/Intersect use the first as subject). */
+export function selectedVectors(store: EditorStore): Vector[] {
+  return store.ui.selection
+    .map((id) => store.doc.vectors.find((v) => v.id === id))
+    .filter((v): v is Vector => !!v);
+}
+
+export function copySelection(store: EditorStore): boolean {
+  const sel = selectedVectors(store);
+  if (sel.length === 0) {
+    store.setUi({ message: 'Select shapes to copy' });
+    return false;
+  }
+  store.clipboard = sel.map((v) => ({ layer: v.layer, closed: v.closed, segments: v.segments }));
+  store.setUi({ message: `Copied ${sel.length} shape${sel.length === 1 ? '' : 's'}` });
+  return true;
+}
+
+export function cutSelection(store: EditorStore): void {
+  if (!copySelection(store)) return;
+  store.execute(deleteVectors(store.ui.selection));
+}
+
+/** Pastes the clipboard a little down and to the right, into the active layer, and selects it. */
+export function pasteClipboard(store: EditorStore): void {
+  if (store.clipboard.length === 0) {
+    store.setUi({ message: 'Nothing to paste: copy shapes first' });
+    return;
+  }
+  const m = translation(5, -5);
+  const layer = store.ui.activeLayer;
+  const vectors = store.clipboard.map((v) => ({
+    ...v,
+    layer,
+    segments: transformSegments(v.segments, m),
+  }));
+  // Next paste goes a step further, like repeated Ctrl+V in drawing programs.
+  store.clipboard = vectors.map((v) => ({ ...v }));
+  const before = new Set(store.doc.vectors.map((v) => v.id));
+  store.execute(addVectors(vectors, 'Paste'));
+  store.select(store.doc.vectors.filter((v) => !before.has(v.id)).map((v) => v.id));
+}
+
+export function deleteSelection(store: EditorStore): void {
+  if (store.ui.selection.length) store.execute(deleteVectors(store.ui.selection));
+}
+
+export function duplicateSelection(store: EditorStore): void {
+  const ids = store.ui.selection;
+  if (!ids.length) return;
+  const before = new Set(store.doc.vectors.map((v) => v.id));
+  store.execute(duplicateVectors(ids, translation(5, -5)));
+  store.select(store.doc.vectors.filter((v) => !before.has(v.id)).map((v) => v.id));
+}
+
+export function selectAll(store: EditorStore): void {
+  const ok = new Set(store.doc.layers.filter((l) => l.visible && !l.locked).map((l) => l.id));
+  store.select(store.doc.vectors.filter((v) => ok.has(v.layer)).map((v) => v.id));
+}
+
+// --- Vector -------------------------------------------------------------------
+
+/** Flattening tolerance for booleans/offsets (mm). */
+const GEOM_TOL = 0.01;
+
+/** Closed rings of the given vectors (open vectors are ignored). */
+export function ringsOf(vectors: readonly Vector[]): Vec2[][] {
+  return vectors
+    .filter((v) => v.closed)
+    .flatMap((v) => flatten(v.segments, GEOM_TOL, true).map((p) => p.points));
+}
+
+/** One vector holding all rings of a region (outer + holes stay together). */
+export function regionVector(rings: Vec2[][], layer: string): Omit<Vector, 'id'> | undefined {
+  const segments: Segment[] = [];
+  for (const ring of rings) {
+    ring.forEach((p, i) => segments.push({ type: i === 0 ? 'move' : 'line', p: [p[0], p[1]] }));
+    segments.push({ type: 'close' });
+  }
+  return segments.length ? { layer, closed: true, segments } : undefined;
+}
+
+/** Weld (union), Trim (difference) or Intersect the selected closed shapes. */
+export function booleanSelection(store: EditorStore, op: BooleanOp, label: string): void {
+  const closed = selectedVectors(store).filter((v) => v.closed);
+  const [first, ...rest] = closed;
+  if (!first || rest.length === 0) {
+    store.setUi({ message: `${label} needs two or more closed shapes selected` });
+    return;
+  }
+  const result =
+    op === 'union'
+      ? booleanOp('union', ringsOf(closed), [], 'nonZero')
+      : booleanOp(op, ringsOf([first]), ringsOf(rest));
+  const vec = regionVector(result, first.layer);
+  store.execute(
+    composite(label, [
+      deleteVectors(closed.map((v) => v.id)),
+      ...(vec ? [addVectors([vec], label)] : []),
+    ]),
+  );
+  const last = store.doc.vectors.at(-1);
+  store.select(vec && last ? [last.id] : []);
+}
+
+/** Adds an outline `distance` outside (sign 1) or inside (−1) each selected closed shape. */
+export function offsetSelection(store: EditorStore, sign: 1 | -1, distance: number): void {
+  const closed = selectedVectors(store).filter((v) => v.closed);
+  if (closed.length === 0) {
+    store.setUi({ message: 'Select closed shapes to offset' });
+    return;
+  }
+  const vecs = closed
+    .map((v) => regionVector(offset(ringsOf([v]), sign * distance), v.layer))
+    .filter((v): v is Omit<Vector, 'id'> => !!v);
+  if (vecs.length === 0) {
+    store.setUi({ message: 'The inset is larger than the shape, so nothing is left' });
+    return;
+  }
+  store.execute(addVectors(vecs, sign > 0 ? 'Offset outward' : 'Offset inward'));
+}
+
+export type QuickTransform = 'mirror' | 'flip' | 'rotateCcw' | 'rotateCw' | 'centre';
+
+/** Mirror, flip, rotate by 90° about the selection centre, or centre it on the material. */
+export function transformSelection(store: EditorStore, kind: QuickTransform): void {
+  const sel = selectedVectors(store);
+  const ids = sel.map((v) => v.id);
+  if (!ids.length) {
+    store.setUi({ message: 'Select shapes first' });
+    return;
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const v of sel)
+    for (const p of flatten(v.segments, GEOM_TOL, v.closed).flatMap((x) => x.points)) {
+      minX = Math.min(minX, p[0]);
+      maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]);
+      maxY = Math.max(maxY, p[1]);
+    }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const { width, height } = store.doc.stock;
+  const [m, label] =
+    kind === 'mirror'
+      ? [scaling(-1, 1, cx, cy), 'Mirror']
+      : kind === 'flip'
+        ? [scaling(1, -1, cx, cy), 'Flip']
+        : kind === 'rotateCcw'
+          ? [rotation(Math.PI / 2, cx, cy), 'Rotate']
+          : kind === 'rotateCw'
+            ? [rotation(-Math.PI / 2, cx, cy), 'Rotate']
+            : [translation(width / 2 - cx, height / 2 - cy), 'Centre on material'];
+  store.execute(transformVectors(ids, m, label));
+}
+
+// --- Relief -------------------------------------------------------------------
+
+type FromVector = Extract<ReliefOp, { op: 'fromVector' }>;
+
+export function activeRelief(store: EditorStore): Relief | undefined {
+  const { reliefs } = store.doc;
+  return reliefs.find((r) => r.id === store.ui.activeRelief) ?? reliefs[0];
+}
+
+/** The active relief, creating one at the form's resolution when there is none. */
+export function ensureRelief(store: EditorStore): Relief {
+  const existing = activeRelief(store);
+  if (existing) return existing;
+  store.execute(addRelief(store.ui.reliefForm.resolution));
+  const created = store.doc.reliefs.at(-1) as Relief;
+  store.setUi({ activeRelief: created.id });
+  return created;
+}
+
+export function setReliefForm(store: EditorStore, patch: Partial<ReliefForm>): void {
+  store.setUi({ reliefForm: { ...store.ui.reliefForm, ...patch } });
+}
+
+/** Shape to relief: each selected closed shape with the form's profile and height. */
+export function shapesToRelief(store: EditorStore, mode?: FromVector['mode']): void {
+  const closed = selectedVectors(store).filter((v) => v.closed);
+  if (closed.length === 0) {
+    store.setUi({ message: 'Select closed shapes on the canvas first' });
+    return;
+  }
+  const f = store.ui.reliefForm;
+  const relief = ensureRelief(store);
+  store.execute(
+    composite(
+      'Shapes to relief',
+      closed.map((v) =>
+        setReliefOp(relief.id, {
+          op: 'fromVector',
+          vector: v.id,
+          profile: f.profile,
+          height: f.height,
+          ...(f.profile === 'angle' ? { angle: f.angle } : {}),
+          mode: mode ?? f.mode,
+        }),
+      ),
+    ),
+  );
+}
+
+function needRelief(store: EditorStore): Relief | undefined {
+  const r = activeRelief(store);
+  if (!r) store.setUi({ message: 'Make a relief first (Relief › Shape to relief)' });
+  return r;
+}
+
+export function smoothRelief(store: EditorStore): void {
+  const r = needRelief(store);
+  if (r)
+    store.execute(
+      setReliefOp(r.id, { op: 'smooth', radius: store.ui.reliefForm.smoothRadius, passes: 3 }),
+    );
+}
+
+export function scaleRelief(store: EditorStore): void {
+  const r = needRelief(store);
+  if (r) store.execute(setReliefOp(r.id, { op: 'scale', factor: store.ui.reliefForm.factor }));
+}
+
+export function invertRelief(store: EditorStore): void {
+  const r = needRelief(store);
+  if (r) store.execute(setReliefOp(r.id, { op: 'invert' }));
+}
+
+export function exportStl(store: EditorStore): void {
+  const r = needRelief(store);
+  const grid = r ? store.relief(r.id).grid : undefined;
+  if (grid) download('relief.stl', reliefToStl(grid), 'model/stl');
+}
+
+/** Decodes an image file to grayscale bytes (rows top to bottom), at most `max` px on the long side. */
+async function imageToGray(
+  file: File,
+  max = 1000,
+): Promise<{ px: Uint8Array; w: number; h: number }> {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const w = Math.max(1, Math.round(bmp.width * s));
+  const h = Math.max(1, Math.round(bmp.height * s));
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+  ctx.drawImage(bmp, 0, 0, w, h);
+  const rgba = ctx.getImageData(0, 0, w, h).data;
+  const px = new Uint8Array(w * h);
+  for (let i = 0; i < px.length; i++) {
+    const a = (rgba[i * 4 + 3] as number) / 255;
+    // Luminance; transparent pixels count as black (no height).
+    px[i] = Math.round(
+      a *
+        (0.299 * (rgba[i * 4] as number) +
+          0.587 * (rgba[i * 4 + 1] as number) +
+          0.114 * (rgba[i * 4 + 2] as number)),
+    );
+  }
+  return { px, w, h };
+}
+
+/** Image to relief: picks an image, fits it in the material, bright parts high. */
+export async function addImageRelief(store: EditorStore): Promise<void> {
+  const file = await pickFile('image/*');
+  if (!file) return;
+  try {
+    const { px, w, h } = await imageToGray(file);
+    const relief = ensureRelief(store);
+    const id = store.addImage(px);
+    const { doc } = store;
+    const f = store.ui.reliefForm;
+    // Fit the image inside the material, keeping its aspect ratio, centred.
+    const s = Math.min(doc.stock.width / w, doc.stock.height / h);
+    const W = w * s;
+    const H = h * s;
+    store.execute(
+      setReliefOp(relief.id, {
+        op: 'fromImage',
+        image: id,
+        px: w,
+        py: h,
+        x: (doc.stock.width - W) / 2,
+        y: (doc.stock.height - H) / 2,
+        w: W,
+        h: H,
+        height: f.imageHeight,
+        mode: f.mode,
+      }),
+    );
+  } catch (e) {
+    store.setUi({ message: `Could not read the image: ${(e as Error).message}` });
+  }
+}
+
+// --- Toolpath -----------------------------------------------------------------
+
+export const TOOLPATH_LABEL: Record<Toolpath['type'], string> = {
+  profile: 'Profile',
+  pocket: 'Pocket',
+  vcarve: 'V-carve',
+  drill: 'Drill',
+  rough3d: '3D rough',
+  finish3d: '3D finish',
+};
+
+/** Creates a toolpath of `type` for the selection (or the relief) and makes it active. */
+export function createToolpath(store: EditorStore, type: Toolpath['type']): void {
+  const doc = store.doc;
+  const vectors = store.ui.selection.filter((id) => doc.vectors.some((v) => v.id === id));
+  const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
+  // V-carving needs a V-bit: use one from the library when the active tool is not.
+  // Each job prefers the tool type it needs when the library has one.
+  const want =
+    type === 'vcarve'
+      ? 'vbit'
+      : type === 'finish3d'
+        ? 'ballnose'
+        : type === 'rough3d'
+          ? 'flat'
+          : undefined;
+  const tool =
+    want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active;
+  const relief = activeRelief(store);
+  const is3d = type === 'rough3d' || type === 'finish3d';
+  if (!tool) {
+    store.setUi({ message: 'Add a tool first (Tools section below)' });
+    return;
+  }
+  if (is3d && !relief) {
+    store.setUi({ message: 'Make a relief first (step 2, Relief)' });
+    return;
+  }
+  if (vectors.length === 0 && !is3d) {
+    store.setUi({ message: 'Select the shapes to machine on the canvas first' });
+    return;
+  }
+  const depth = type === 'profile' ? doc.stock.thickness : Math.min(3, doc.stock.thickness);
+  const params =
+    type === 'profile'
+      ? { side: 'outside' as const, depth }
+      : type === 'pocket'
+        ? { depth, strategy: 'offset' as const }
+        : type === 'vcarve'
+          ? { depth: Math.min(6, doc.stock.thickness) }
+          : type === 'rough3d'
+            ? { allowance: 0.5 }
+            : type === 'finish3d'
+              ? { pattern: 'x' as const }
+              : { depth };
+  if (type === 'vcarve' && tool.type !== 'vbit') {
+    store.setUi({
+      message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
+    });
+  }
+  const name = `${TOOLPATH_LABEL[type]} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;
+  store.execute(
+    addToolpath({
+      type,
+      tool: tool.id,
+      // 3D jobs cover the whole relief unless shapes are selected as a boundary (roughing only).
+      vectors: is3d && type === 'finish3d' ? [] : vectors,
+      name,
+      params,
+      ...(is3d && relief ? { relief: relief.id } : {}),
+    } as Parameters<typeof addToolpath>[0]),
+  );
+  store.setUi({ activeToolpath: store.doc.toolpaths.at(-1)?.id });
+}
+
+/**
+ * Exports the toolpath's G-code. The CAM worker runs the safety checker on
+ * the output text and refuses (export blocked) on any error or when the
+ * current settings have not been simulated.
+ */
+export async function exportGcode(store: EditorStore, runner: CamRunner, tpId: string) {
+  const res = await runner.export(store.doc, tpId);
+  if (!res) return;
+  if (res.ok) {
+    download(res.fileName, res.gcode, 'text/plain');
+    store.setUi({ message: `Exported ${res.fileName}: G-code checker passed` });
+  } else {
+    const first = res.issues.find((i) => i.severity === 'error');
+    store.setUi({ message: `Export blocked: ${first?.message ?? 'checker error'}` });
+  }
+}

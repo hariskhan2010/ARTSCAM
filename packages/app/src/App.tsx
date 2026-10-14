@@ -1,110 +1,30 @@
-import {
-  addVectors,
-  exportDxf,
-  exportSvg,
-  formatFixed,
-  fromMm,
-  importDxf,
-  importSvg,
-  loadProject,
-  newProject,
-  saveProject,
-  PRECISION,
-} from '@naqsh/core';
-import {
-  FileDown,
-  FilePlus,
-  FileUp,
-  FolderOpen,
-  Redo2,
-  Save,
-  Mountain,
-  Shapes,
-  Route,
-  Undo2,
-} from 'lucide-react';
+import { newProject } from '@naqsh/core';
+import { Box, Mountain, PenTool } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { loadAutosave, saveAutosave } from './autosave';
 import { CamRunner } from './cam/runner';
 import { Canvas } from './editor/Canvas';
-import { TOOL_INFO } from './editor/CanvasOverlay';
-import { useStore, EditorStore, type ToolName } from './editor/store';
-import { download, pickFile } from './files';
+import { Relief3D } from './editor/Relief3D';
+import { useStore, EditorStore } from './editor/store';
+import { zoomPercent } from './editor/viewActions';
+import { menus, toolbarRow1, toolbarRow2, toolStrip, zoomBar } from './layout/commands';
+import { IconBar } from './layout/IconBar';
+import { ModelInfo, StatusBar } from './layout/Info';
+import { MenuBar } from './layout/MenuBar';
+import { ProjectTree } from './layout/ProjectTree';
+import { Rulers } from './layout/Rulers';
+import { BitmapsPanel } from './panels/BitmapsPanel';
 import { CamPanel } from './panels/CamPanel';
-import { Btn } from './panels/common';
 import { DesignPanel } from './panels/DesignPanel';
 import { ReliefPanel } from './panels/ReliefPanel';
-import { Relief3D } from './editor/Relief3D';
 
-/** Tool palette, grouped: selecting, freehand, shapes, view. */
-const TOOL_GROUPS: ToolName[][] = [
-  ['select', 'node'],
-  ['pen', 'line', 'text'],
-  ['rect', 'ellipse', 'polygon', 'star'],
-  ['pan'],
-];
-
-async function openProject(store: EditorStore) {
-  const file = await pickFile('.zip,.naqsh');
-  if (!file) return;
-  try {
-    const { project, images } = loadProject(new Uint8Array(await file.arrayBuffer()));
-    store.load(project, images);
-    store.setUi({ message: `Opened ${file.name}` });
-  } catch (e) {
-    store.setUi({ message: (e as Error).message });
-  }
-}
-
-function saveProjectFile(store: EditorStore) {
-  try {
-    const bytes = saveProject(store.bundle());
-    download('project.naqsh.zip', bytes, 'application/zip');
-  } catch (e) {
-    store.setUi({ message: (e as Error).message });
-  }
-}
-
-async function importVectors(store: EditorStore) {
-  const file = await pickFile('.svg,.dxf');
-  if (!file) return;
-  const text = await file.text();
-  try {
-    const layer = store.ui.activeLayer;
-    const isDxf = file.name.toLowerCase().endsWith('.dxf');
-    const result = isDxf ? importDxf(text) : importSvg(text);
-    const vectors = result.vectors.map((v) => ({ layer, closed: v.closed, segments: v.segments }));
-    const before = new Set(store.doc.vectors.map((v) => v.id));
-    store.execute(addVectors(vectors, `Import ${file.name}`));
-    store.select(store.doc.vectors.filter((v) => !before.has(v.id)).map((v) => v.id));
-    const warn = result.warnings.length ? ` — ${result.warnings.join('; ')}` : '';
-    store.setUi({ message: `Imported ${vectors.length} vectors from ${file.name}${warn}` });
-  } catch (e) {
-    store.setUi({ message: `Import failed: ${(e as Error).message}` });
-  }
-}
-
-function exportSvgFile(store: EditorStore) {
-  const { doc } = store;
-  const visible = new Set(doc.layers.filter((l) => l.visible).map((l) => l.id));
-  const text = exportSvg(
-    doc.vectors.filter((v) => visible.has(v.layer)),
-    { width: doc.stock.width, height: doc.stock.height },
-  );
-  download('design.svg', text, 'image/svg+xml');
-}
-
-function exportDxfFile(store: EditorStore) {
-  const { doc } = store;
-  const layers = new Map(doc.layers.filter((l) => l.visible).map((l) => [l.id, l.name]));
-  const text = exportDxf(
-    doc.vectors
-      .filter((v) => layers.has(v.layer))
-      .map((v) => ({ segments: v.segments, closed: v.closed, layer: layers.get(v.layer) ?? '0' })),
-  );
-  download('design.dxf', text, 'application/dxf');
-}
-
+/**
+ * Window layout, in the places ex-ArtCAM users expect them (our own icons,
+ * colours and wording): menu bar; two toolbar rows; the drawing tool strip
+ * on the left; 2D/3D view tabs with a zoom bar, rulers and the canvas in the
+ * middle; the Project tree, the picked item's panel and Model Information on
+ * the right; and the status bar at the bottom.
+ */
 export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
   const runner = useMemo(
@@ -138,183 +58,89 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
     };
   }, [store]);
   useStore(store);
-  const { ui, doc, history } = store;
-  const fmt = (mm: number) => formatFixed(fromMm(mm, doc.units), PRECISION[doc.units].display);
-  const unit = doc.units === 'mm' ? 'mm' : 'in';
+  const { ui, doc } = store;
   const shownRelief = doc.reliefs.find((r) => r.id === ui.activeRelief) ?? doc.reliefs[0];
   const reliefGrid = shownRelief ? store.relief(shownRelief.id).grid : undefined;
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden>
-            <Route size={16} />
-          </span>
-          Naqsh <small>beta</small>
-        </div>
-        <Btn
-          icon={FilePlus}
-          label="New"
-          variant="ghost"
-          onClick={() => confirmNew(store)}
-          title="Start a new project"
-        />
-        <Btn
-          icon={FolderOpen}
-          label="Open"
-          variant="ghost"
-          onClick={() => void openProject(store)}
-          title="Open a project file (.zip)"
-        />
-        <Btn
-          icon={Save}
-          label="Save"
-          variant="ghost"
-          onClick={() => saveProjectFile(store)}
-          title="Save the project as a .zip file"
-          testId="save"
-        />
-        <span className="divider" />
-        <Btn
-          icon={FileUp}
-          label="Import"
-          variant="ghost"
-          onClick={() => void importVectors(store)}
-          title="Import shapes from an SVG or DXF file"
-          testId="import"
-        />
-        <Btn
-          icon={FileDown}
-          label="Export SVG"
-          variant="ghost"
-          onClick={() => exportSvgFile(store)}
-          title="Export the visible shapes as SVG"
-          testId="export-svg"
-        />
-        <Btn
-          icon={FileDown}
-          label="Export DXF"
-          variant="ghost"
-          onClick={() => exportDxfFile(store)}
-          title="Export the visible shapes as DXF (mm)"
-          testId="export-dxf"
-        />
-        <span className="divider" />
-        <Btn
-          icon={Undo2}
-          variant="ghost"
-          onClick={() => store.undo()}
-          disabled={!history.canUndo}
-          title={history.undoLabel ? `Undo ${history.undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
-          testId="undo"
-        />
-        <Btn
-          icon={Redo2}
-          variant="ghost"
-          onClick={() => store.redo()}
-          disabled={!history.canRedo}
-          title={history.redoLabel ? `Redo ${history.redoLabel} (Ctrl+Y)` : 'Nothing to redo'}
-          testId="redo"
-        />
-      </header>
+      <MenuBar menus={menus(store, runner)} />
+      <IconBar items={toolbarRow1(store)} label="File and vector tools" className="toolbar-row" />
+      <IconBar
+        items={toolbarRow2(store)}
+        label="View, relief and toolpath tools"
+        className="toolbar-row"
+      />
 
-      <nav className="toolbox" aria-label="Drawing tools">
-        {TOOL_GROUPS.map((group, gi) => (
-          <div key={gi} style={{ display: 'contents' }}>
-            {gi > 0 && <hr />}
-            {group.map((id) => {
-              const t = TOOL_INFO[id];
-              const Icon = t.icon;
-              return (
-                <button
-                  key={id}
-                  className={ui.tool === id ? 'tool active' : 'tool'}
-                  data-tip={`${t.name}  (${t.key})`}
-                  aria-label={t.name}
-                  aria-pressed={ui.tool === id}
-                  data-testid={`tool-${id}`}
-                  onClick={() => store.setUi({ tool: id })}
-                >
-                  <Icon size={18} aria-hidden />
-                  <kbd aria-hidden>{t.key}</kbd>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+      <IconBar items={toolStrip(store)} label="Drawing tools" vertical className="toolbox" />
 
       <main className="stage">
-        <Canvas store={store} runner={runner} />
-        {ui.show3d && reliefGrid && (
-          <Relief3D grid={reliefGrid} onClose={() => store.setUi({ show3d: false })} />
-        )}
+        <div className="stage-bar">
+          <div className="view-tabs" role="tablist" aria-label="View">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!ui.show3d}
+              className={!ui.show3d ? 'active' : ''}
+              onClick={() => store.setUi({ show3d: false })}
+              data-testid="view-2d"
+            >
+              <PenTool size={13} aria-hidden /> 2D View
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ui.show3d}
+              className={ui.show3d ? 'active' : ''}
+              onClick={() => store.setUi({ show3d: true })}
+              data-testid="view-3d"
+            >
+              <Box size={13} aria-hidden /> 3D View
+            </button>
+          </div>
+          {!ui.show3d && (
+            <>
+              <IconBar items={zoomBar(store)} label="Zoom" className="zoom-bar" />
+              <span className="zoom" data-testid="zoom" title="Zoom (100% fits the material)">
+                {zoomPercent(store)}%
+              </span>
+            </>
+          )}
+        </div>
+        <div className="stage-body">
+          <Rulers store={store} />
+          <div className="canvas-wrap">
+            <Canvas store={store} runner={runner} />
+          </div>
+          {ui.show3d &&
+            (reliefGrid ? (
+              <Relief3D grid={reliefGrid} onClose={() => store.setUi({ show3d: false })} />
+            ) : (
+              <div className="relief-3d empty" data-testid="relief-3d-empty">
+                <Mountain size={28} aria-hidden />
+                <p>No relief yet. Draw shapes, then use Relief › Shape to relief.</p>
+              </div>
+            ))}
+        </div>
       </main>
 
       <aside className="sidebar">
-        <div className="steps" role="tablist" aria-label="Workflow">
-          <button
-            role="tab"
-            aria-selected={ui.sidebarTab === 'design'}
-            className={ui.sidebarTab === 'design' ? 'active' : ''}
-            onClick={() => store.setUi({ sidebarTab: 'design' })}
-            data-testid="tab-design"
-          >
-            <span className="num">1</span>
-            <Shapes size={15} aria-hidden /> Design
-          </button>
-          <button
-            role="tab"
-            aria-selected={ui.sidebarTab === 'relief'}
-            className={ui.sidebarTab === 'relief' ? 'active' : ''}
-            onClick={() => store.setUi({ sidebarTab: 'relief' })}
-            data-testid="tab-relief"
-          >
-            <span className="num">2</span>
-            <Mountain size={15} aria-hidden /> Relief
-          </button>
-          <button
-            role="tab"
-            aria-selected={ui.sidebarTab === 'cam'}
-            className={ui.sidebarTab === 'cam' ? 'active' : ''}
-            onClick={() => store.setUi({ sidebarTab: 'cam' })}
-            data-testid="tab-cam"
-          >
-            <span className="num">3</span>
-            <Route size={15} aria-hidden /> Toolpaths
-          </button>
+        <ProjectTree store={store} />
+        <div className="panel-host">
+          {ui.sidebarTab === 'design' ? (
+            <DesignPanel store={store} />
+          ) : ui.sidebarTab === 'bitmaps' ? (
+            <BitmapsPanel store={store} />
+          ) : ui.sidebarTab === 'relief' ? (
+            <ReliefPanel store={store} />
+          ) : (
+            <CamPanel store={store} runner={runner} />
+          )}
         </div>
-        {ui.sidebarTab === 'design' ? (
-          <DesignPanel store={store} />
-        ) : ui.sidebarTab === 'relief' ? (
-          <ReliefPanel store={store} />
-        ) : (
-          <CamPanel store={store} runner={runner} />
-        )}
+        <ModelInfo store={store} />
       </aside>
 
-      <footer className="status">
-        <span className="coords">
-          {ui.cursor
-            ? `X ${fmt(ui.cursor[0])}   Y ${fmt(ui.cursor[1])} ${unit}`
-            : 'Move over the canvas'}
-        </span>
-        <span data-testid="vector-count">{doc.vectors.length} vectors</span>
-        <span>{ui.selection.length} selected</span>
-        <span className="message" role="status" data-testid="message">
-          {ui.message}
-        </span>
-      </footer>
+      <StatusBar store={store} />
     </div>
   );
-}
-
-function confirmNew(store: EditorStore) {
-  if (
-    store.doc.vectors.length > 0 &&
-    !window.confirm('Start a new project? Unsaved changes are lost.')
-  )
-    return;
-  store.load(newProject());
 }
