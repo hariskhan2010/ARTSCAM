@@ -81,10 +81,19 @@ importers:
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
+      harfbuzzjs:
+        specifier: 1.6.3
+        version: 1.6.3
       zod:
         specifier: ^4.6.6
         version: 4.6.6
     devDependencies:
+      '@fontsource/noto-naskh-arabic':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/noto-nastaliq-urdu':
+        specifier: 5.3.0
+        version: 5.3.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
@@ -208,6 +217,12 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@fontsource/noto-naskh-arabic@5.3.0':
+    resolution: {integrity: sha512-S/GDgQ6mh/PKo4mz5+eXNYbEarvpI7yh6eCdOz8tTVbeM7+OUiacIEscaYEibr/+egDtGbO2ZB00sjy1bJC1kQ==}
+
+  '@fontsource/noto-nastaliq-urdu@5.3.0':
+    resolution: {integrity: sha512-rhozTu22mlnDp5R8A4gGeNJvoLroHEV0TytCwly20w1LMA+VXs/MyhORGJu3i3SWZFdyeCFe5EF5xzraq6zd6A==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -670,6 +685,9 @@ packages:
   globals@17.13.0:
     resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
     engines: {node: '>=18'}
+
+  harfbuzzjs@1.6.3:
+    resolution: {integrity: sha512-R5Mfo1UUvQmZJmtScP7fBLKYKnYu82ZdtFT7WbQYeGb3Ut5PR3xfFCJ5/FjbcW5SAfb9cqCSny/KNjp+NJBx0w==}
 
   hashery@1.5.1:
     resolution: {integrity: sha512-iZyKG96/JwPz1N55vj2Ie2vXbhu440zfUfJvSwEqEbeLluk7NnapfGqa7LH0mOsnDxTF85Mx8/dyR6HfqcbmbQ==}
@@ -1255,6 +1273,10 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
+  '@fontsource/noto-naskh-arabic@5.3.0': {}
+
+  '@fontsource/noto-nastaliq-urdu@5.3.0': {}
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -1674,6 +1696,8 @@ snapshots:
       is-glob: 4.0.3
 
   globals@17.13.0: {}
+
+  harfbuzzjs@1.6.3: {}
 
   hashery@1.5.1:
     dependencies:

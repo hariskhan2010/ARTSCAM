@@ -26,3 +26,5 @@ export * from './cam/export';
 export * from './post/grbl';
 export * from './sim/time';
 export * from './sim/heightmap';
+export * from './text/text';
+export { toSfnt, sniffFont, FontFormatError, type FontFormat } from './text/woff';

@@ -256,6 +256,15 @@ Each task is one PR. Don't start a task until the previous one's acceptance chec
 | T2.6 2D preview + time estimate | Estimate within ±15% of GRBL sim time |
 | T2.7 Export flow: simulate → check → download `.nc` | Export blocked on any checker error |
 
+**M3: text + V-carve**
+| Task | Acceptance |
+|---|---|
+| T3.1 Fonts + shaping: load TTF/OTF/WOFF, shape with HarfBuzz (WASM), glyph outlines → vectors (nonzero-clean) | Arabic/Urdu joining forms and lam-alef ligature shape correctly; RTL order; outlines are clean closed regions |
+| T3.2 Text layout: height in mm, alignment, line spacing, multi-line, bidi runs, Latin fallback inside Arabic fonts | Layout tests incl. mixed Urdu + Latin line |
+| T3.3 Text tool in the UI: place, type, pick font (bundled Naskh, Nastaliq, Latin; or load a font file) | Playwright: Urdu text placed at the chosen size |
+| T3.4 V-carve toolpath: exact V surface from distance-to-edge, max depth with flat bottom, depth passes | Simulated surface matches the ideal V surface within tolerance; golden G-code; checker passes (V-bit enforced) |
+| T3.5 V-carve in the Toolpaths panel, preview, export | Playwright: calligraphy sign → V-carve → simulate → export |
+
 ## 12. Evaluation
 
 | Metric | How |

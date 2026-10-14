@@ -12,6 +12,8 @@ Licences were read from each package's `package.json` after install.
 | zod | MIT | core: project schema validation | T0.2 |
 | fflate | MIT | core: project .zip read/write | T0.2 |
 | lucide-react | ISC | app: icons (1.44.0, pinned) | UI pass |
+| harfbuzzjs | MIT (HarfBuzz: Old MIT) | core: text shaping (Arabic/Urdu joining, ligatures, marks) and glyph outlines, WASM | T3.1 |
+| @fontsource/noto-naskh-arabic, @fontsource/noto-nastaliq-urdu | OFL-1.1 (fonts) | app: bundled Naskh and Nastaliq fonts; core tests | T3.1 |
 | clipper2-ts | BSL-1.0 | core: polygon offsets and booleans (Clipper2 port). `clipper2-js` 1.2.4 was tried first and rejected: it returns wrong offsets and unions | T1.3 |
 
 ## Development only (not shipped)
