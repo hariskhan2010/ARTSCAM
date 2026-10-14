@@ -18,6 +18,7 @@ import {
   FolderOpen,
   Redo2,
   Save,
+  Mountain,
   Shapes,
   Route,
   Undo2,
@@ -32,6 +33,8 @@ import { download, pickFile } from './files';
 import { CamPanel } from './panels/CamPanel';
 import { Btn } from './panels/common';
 import { DesignPanel } from './panels/DesignPanel';
+import { ReliefPanel } from './panels/ReliefPanel';
+import { Relief3D } from './editor/Relief3D';
 
 /** Tool palette, grouped: selecting, freehand, shapes, view. */
 const TOOL_GROUPS: ToolName[][] = [
@@ -45,8 +48,8 @@ async function openProject(store: EditorStore) {
   const file = await pickFile('.zip,.naqsh');
   if (!file) return;
   try {
-    const { project, reliefData } = loadProject(new Uint8Array(await file.arrayBuffer()));
-    store.load(project, reliefData);
+    const { project, images } = loadProject(new Uint8Array(await file.arrayBuffer()));
+    store.load(project, images);
     store.setUi({ message: `Opened ${file.name}` });
   } catch (e) {
     store.setUi({ message: (e as Error).message });
@@ -55,7 +58,7 @@ async function openProject(store: EditorStore) {
 
 function saveProjectFile(store: EditorStore) {
   try {
-    const bytes = saveProject({ project: store.doc, reliefData: store.reliefData });
+    const bytes = saveProject(store.bundle());
     download('project.naqsh.zip', bytes, 'application/zip');
   } catch (e) {
     store.setUi({ message: (e as Error).message });
@@ -114,15 +117,12 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
     void loadAutosave().then((saved) => {
       if (!active || !saved || store.history.canUndo || store.doc.vectors.length) return;
       if (saved.project.vectors.length === 0 && saved.project.toolpaths.length === 0) return;
-      store.load(saved.project, saved.reliefData);
+      store.load(saved.project, saved.images);
       store.setUi({ message: 'Restored your last session (autosaved in this browser)' });
     });
     const unsubscribe = store.history.subscribe(() => {
       clearTimeout(timer);
-      timer = setTimeout(
-        () => void saveAutosave({ project: store.doc, reliefData: store.reliefData }),
-        1000,
-      );
+      timer = setTimeout(() => void saveAutosave(store.bundle()), 1000);
     });
     return () => {
       active = false;
@@ -134,6 +134,8 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
   const { ui, doc, history } = store;
   const fmt = (mm: number) => formatFixed(fromMm(mm, doc.units), PRECISION[doc.units].display);
   const unit = doc.units === 'mm' ? 'mm' : 'in';
+  const shownRelief = doc.reliefs.find((r) => r.id === ui.activeRelief) ?? doc.reliefs[0];
+  const reliefGrid = shownRelief ? store.relief(shownRelief.id).grid : undefined;
 
   return (
     <div className="app">
@@ -238,6 +240,9 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
 
       <main className="stage">
         <Canvas store={store} runner={runner} />
+        {ui.show3d && reliefGrid && (
+          <Relief3D grid={reliefGrid} onClose={() => store.setUi({ show3d: false })} />
+        )}
       </main>
 
       <aside className="sidebar">
@@ -254,17 +259,29 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
           </button>
           <button
             role="tab"
+            aria-selected={ui.sidebarTab === 'relief'}
+            className={ui.sidebarTab === 'relief' ? 'active' : ''}
+            onClick={() => store.setUi({ sidebarTab: 'relief' })}
+            data-testid="tab-relief"
+          >
+            <span className="num">2</span>
+            <Mountain size={15} aria-hidden /> Relief
+          </button>
+          <button
+            role="tab"
             aria-selected={ui.sidebarTab === 'cam'}
             className={ui.sidebarTab === 'cam' ? 'active' : ''}
             onClick={() => store.setUi({ sidebarTab: 'cam' })}
             data-testid="tab-cam"
           >
-            <span className="num">2</span>
+            <span className="num">3</span>
             <Route size={15} aria-hidden /> Toolpaths
           </button>
         </div>
         {ui.sidebarTab === 'design' ? (
           <DesignPanel store={store} />
+        ) : ui.sidebarTab === 'relief' ? (
+          <ReliefPanel store={store} />
         ) : (
           <CamPanel store={store} runner={runner} />
         )}

@@ -14,6 +14,7 @@ Licences were read from each package's `package.json` after install.
 | lucide-react | ISC | app: icons (1.44.0, pinned) | UI pass |
 | harfbuzzjs | MIT (HarfBuzz: Old MIT) | core: text shaping (Arabic/Urdu joining, ligatures, marks) and glyph outlines, WASM | T3.1 |
 | @fontsource/noto-naskh-arabic, @fontsource/noto-nastaliq-urdu | OFL-1.1 (fonts) | app: bundled Naskh and Nastaliq fonts; core tests | T3.1 |
+| three | MIT | app: 3D relief view (0.186.1) | T4.4 |
 | clipper2-ts | BSL-1.0 | core: polygon offsets and booleans (Clipper2 port). `clipper2-js` 1.2.4 was tried first and rejected: it returns wrong offsets and unions | T1.3 |
 
 ## Development only (not shipped)
@@ -30,5 +31,6 @@ Licences were read from each package's `package.json` after install.
 | eslint-plugin-react-hooks | MIT | React hooks lint rules | T0.1 |
 | globals | MIT | ESLint global definitions | T0.1 |
 | prettier | MIT | Formatting | T0.1 |
+| @types/three | MIT | Three.js type definitions | T4.4 |
 | @playwright/test | Apache-2.0 | UI smoke tests (uses installed Chrome) | T1.4 |
 | @types/node, @types/react, @types/react-dom | MIT | Type definitions | T0.1 |

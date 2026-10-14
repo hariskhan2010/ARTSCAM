@@ -1,5 +1,7 @@
 import {
   addVectors,
+  gridRange,
+  type Grid,
   deleteVectors,
   duplicateVectors,
   ellipse,
@@ -186,6 +188,38 @@ function nearestSegment(
   return best && { seg: best.seg, t: best.t };
 }
 
+/** Hill-shaded image of a relief grid (light from the top-left), cached per grid. */
+const reliefImages = new WeakMap<Grid, HTMLCanvasElement>();
+function reliefImage(g: Grid): HTMLCanvasElement {
+  const cached = reliefImages.get(g);
+  if (cached) return cached;
+  const c = document.createElement('canvas');
+  c.width = g.cols;
+  c.height = g.rows;
+  const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+  const img = ctx.createImageData(g.cols, g.rows);
+  const { min, max } = gridRange(g.z);
+  const span = Math.max(1e-6, max - min);
+  for (let r = 0; r < g.rows; r++) {
+    for (let col = 0; col < g.cols; col++) {
+      const z = g.z[r * g.cols + col] as number;
+      const zl = g.z[r * g.cols + Math.max(0, col - 1)] as number;
+      const zu = g.z[Math.min(g.rows - 1, r + 1) * g.cols + col] as number;
+      // Slope towards the light (up-left) brightens, away darkens.
+      const shade = Math.max(-60, Math.min(60, (z - zl - (zu - z)) * (40 / g.resolution)));
+      const t = (z - min) / span;
+      const o = ((g.rows - 1 - r) * g.cols + col) * 4;
+      img.data[o] = 150 + t * 80 + shade;
+      img.data[o + 1] = 120 + t * 70 + shade;
+      img.data[o + 2] = 90 + t * 50 + shade;
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  reliefImages.set(g, c);
+  return c;
+}
+
 /** Shaded image of a simulated stock heightmap, cached per result. */
 const simImages = new WeakMap<SimResult, HTMLCanvasElement>();
 function simImage(sim: SimResult): HTMLCanvasElement {
@@ -307,6 +341,23 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       }
       ctx.stroke();
     }
+    // Relief heights as a shaded image while working on the relief.
+    if (store.ui.sidebarTab === 'relief') {
+      const rel =
+        store.doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? store.doc.reliefs[0];
+      const g = rel ? store.relief(rel.id).grid : undefined;
+      if (g) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(
+          reliefImage(g),
+          sx0,
+          sy0,
+          g.cols * g.resolution * v.scale,
+          g.rows * g.resolution * v.scale,
+        );
+      }
+    }
+
     // Simulated stock covers the grid inside the stock.
     if (camState?.sim) {
       ctx.imageSmoothingEnabled = false;

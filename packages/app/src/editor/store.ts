@@ -1,7 +1,10 @@
 import {
+  evaluateRelief,
   History,
   newProject,
   type Command,
+  type Grid,
+  type ProjectBundle,
   type Project,
   type Segment,
   type TextAlign,
@@ -43,7 +46,10 @@ export interface UiState {
   cursor: [number, number] | undefined;
   /** Short message (import warnings, errors). */
   message: string | undefined;
-  sidebarTab: 'design' | 'cam';
+  sidebarTab: 'design' | 'relief' | 'cam';
+  /** Relief shown in the Relief panel, the canvas and the 3D view. */
+  activeRelief: string | undefined;
+  show3d: boolean;
   /** Toolpath shown in the CAM panel and previewed on the canvas. */
   activeToolpath: string | undefined;
   /** Tool being edited in the tool library. */
@@ -55,8 +61,10 @@ export interface UiState {
 
 export class EditorStore {
   readonly history: History<Project>;
-  /** Relief height grids by relief id (binary data kept outside the undo history). */
-  reliefData: Record<string, Float32Array> = {};
+  /** Grayscale images used by image reliefs, by id (immutable, so outside the undo history). */
+  images: Record<string, Uint8Array> = {};
+  /** Relief grids are derived from their ops; cached by everything they depend on. */
+  #reliefCache = new Map<string, { key: string; grid?: Grid; error?: string }>();
   #ui: UiState;
   #listeners = new Set<() => void>();
   #version = 0;
@@ -74,6 +82,8 @@ export class EditorStore {
       cursor: undefined,
       message: undefined,
       sidebarTab: 'design',
+      activeRelief: undefined,
+      show3d: false,
       activeToolpath: undefined,
       activeTool: undefined,
       textDraft: undefined,
@@ -111,8 +121,9 @@ export class EditorStore {
   }
 
   /** Replaces the document (open file / new) and resets history and selection. */
-  load(doc: Project, reliefData: Record<string, Float32Array> = {}): void {
-    this.reliefData = reliefData;
+  load(doc: Project, images: Record<string, Uint8Array> = {}): void {
+    this.images = images;
+    this.#reliefCache.clear();
     this.#ui = {
       ...this.#ui,
       selection: [],
@@ -147,6 +158,48 @@ export class EditorStore {
         activeLayer: layerOk ? this.#ui.activeLayer : (this.doc.layers[0]?.id ?? 'L1'),
       };
     }
+  }
+
+  /** The relief's height grid (rebuilt only when its inputs change), or its error. */
+  relief(id: string): { grid?: Grid; error?: string } {
+    const r = this.doc.reliefs.find((x) => x.id === id);
+    if (!r) return { error: 'No such relief' };
+    const used = new Set(r.ops.flatMap((o) => (o.op === 'fromVector' ? [o.vector] : [])));
+    const key = JSON.stringify([r, this.doc.vectors.filter((v) => used.has(v.id))]);
+    const hit = this.#reliefCache.get(id);
+    if (hit?.key === key) return hit;
+    let entry: { key: string; grid?: Grid; error?: string };
+    try {
+      entry = { key, grid: evaluateRelief(r, this.doc, this.images) };
+    } catch (e) {
+      entry = { key, error: (e as Error).message };
+    }
+    this.#reliefCache.set(id, entry);
+    return entry;
+  }
+
+  /** Stores a grayscale image for an image relief and returns its new id. */
+  addImage(px: Uint8Array): string {
+    let n = 1;
+    while (this.images[`img${n}`]) n++;
+    const id = `img${n}`;
+    this.images[id] = px;
+    return id;
+  }
+
+  /** Everything File › Save writes: project, relief grids and images. */
+  bundle(): ProjectBundle {
+    const reliefData: Record<string, Float32Array> = {};
+    for (const r of this.doc.reliefs) {
+      reliefData[r.id] = this.relief(r.id).grid?.z ?? new Float32Array(r.cols * r.rows);
+    }
+    const used = new Set(
+      this.doc.reliefs.flatMap((r) =>
+        r.ops.flatMap((o) => (o.op === 'fromImage' ? [o.image] : [])),
+      ),
+    );
+    const images = Object.fromEntries(Object.entries(this.images).filter(([k]) => used.has(k)));
+    return { project: this.doc, reliefData, images };
   }
 
   /** Notifies listeners without changing anything (derived data arrived). */

@@ -265,6 +265,22 @@ Each task is one PR. Don't start a task until the previous one's acceptance chec
 | T3.4 V-carve toolpath: exact V surface from distance-to-edge, max depth with flat bottom, depth passes | Simulated surface matches the ideal V surface within tolerance; golden G-code; checker passes (V-bit enforced) |
 | T3.5 V-carve in the Toolpaths panel, preview, export | Playwright: calligraphy sign → V-carve → simulate → export |
 
+**M4: relief engine**
+| Task | Acceptance |
+|---|---|
+| T4.1 Relief grid + shape → relief (flat/dome/angle/round, base), combine (add/subtract/merge high/low/zero), smooth, scale, offset, invert | Profiles match their formulas; distance transform within one cell |
+| T4.2 Image → relief (placement, height, invert, blur); images stored in the project zip | Image round-trips through save/load and rebuilds the same grid |
+| T4.3 STL export | Watertight: every edge shared by exactly two triangles |
+| T4.4 Relief panel, canvas shading, 3D view (Three.js), STL button | Playwright: shape → dome → 3D → STL → undo |
+
+**M5: 3D CAM**
+| Task | Acceptance |
+|---|---|
+| T5.1 Relief placement on the material (top of relief at the top of the stock) and drop-cutter heights for any tool | Drop-cutter matches analytic results for flat, ball and V tools |
+| T5.2 Raster finishing (X, Y, XY) with a ball nose | Simulated surface within the scallop height of the relief; no gouges |
+| T5.3 Z-level roughing (offset pocketing per depth band, leaving an allowance) | No cut below the relief + allowance; material above it removed within step-over |
+| T5.4 3D toolpaths in the UI with simulation and checked export | Playwright: relief → rough + finish → simulate → export |
+
 ## 12. Evaluation
 
 | Metric | How |
