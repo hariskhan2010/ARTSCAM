@@ -74,11 +74,18 @@ export const reliefSchema = z.strictObject({
 
 export const toolSchema = z.strictObject({
   id,
+  /** Display name in the tool library, e.g. "6 mm flat end mill". */
+  name: z.string().optional(),
   type: z.enum(['flat', 'ballnose', 'vbit', 'taperedball']),
   diameter: positive,
   /** Included angle in degrees (V-bit, tapered ball). */
   angle: positive.max(180).optional(),
+  /** Tip diameter (mm) of a tapered ball nose. */
+  tipDiameter: positive.optional(),
+  flutes: z.number().int().positive().optional(),
+  /** Max depth per pass (mm). */
   stepDown: positive,
+  /** Distance between adjacent passes (mm). */
   stepOver: positive,
   /** mm/min */
   feed: positive,
@@ -87,9 +94,12 @@ export const toolSchema = z.strictObject({
   rpm: positive,
 });
 
+const cutDirection = z.enum(['climb', 'conventional']);
+
 export const toolpathSchema = z.discriminatedUnion('type', [
   z.strictObject({
     id,
+    name: z.string().optional(),
     type: z.literal('profile'),
     tool: id,
     vectors: z.array(id).min(1),
@@ -103,6 +113,42 @@ export const toolpathSchema = z.discriminatedUnion('type', [
           height: positive,
         })
         .optional(),
+      /** Ramp into each pass along the path over this length (mm) instead of plunging. */
+      ramp: z.strictObject({ length: positive }).optional(),
+      /** Default climb (for a clockwise spindle). */
+      direction: cutDirection.optional(),
+      /** Material left on the wall for a finishing pass (mm). Default 0. */
+      allowance: nonNegative.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('pocket'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      depth: positive,
+      /** Concentric offsets, or zig-zag raster lines plus a finishing contour. */
+      strategy: z.enum(['offset', 'raster']),
+      /** Raster line angle in degrees (0 = along X). */
+      angle: finite.optional(),
+      direction: cutDirection.optional(),
+      allowance: nonNegative.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('drill'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      depth: positive,
+      /** Peck depth (mm); retract to clear chips after each peck. Omit for one plunge. */
+      peck: positive.optional(),
+      /** Pause at the bottom of each hole (seconds). */
+      dwell: positive.optional(),
     }),
   }),
 ]);
@@ -114,6 +160,12 @@ export const machineSchema = z.strictObject({
   /** mm/min */
   maxFeed: positive,
   safeZ: nonNegative,
+  /** Rapid (G0) rate in mm/min, for time estimates. Default: maxFeed. */
+  rapidFeed: positive.optional(),
+  /** Per-axis acceleration X, Y, Z in mm/s², for time estimates. Default 500, 500, 200. */
+  acceleration: z.tuple([positive, positive, positive]).optional(),
+  /** GRBL junction deviation (mm), for time estimates. Default 0.01. */
+  junctionDeviation: positive.optional(),
 });
 
 const projectShape = z.strictObject({

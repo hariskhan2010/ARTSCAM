@@ -10,6 +10,9 @@ import { projectSchema, type Project } from './schema';
 
 export const PROJECT_JSON_PATH = 'project.json';
 
+/** Earliest DOS timestamp; local time, so a constant per machine. */
+const ZIP_MTIME = new Date(1980, 0, 1);
+
 /** A project document plus the binary height grids it refers to, keyed by relief id. */
 export interface ProjectBundle {
   project: Project;
@@ -78,7 +81,9 @@ export function saveProject(bundle: ProjectBundle): Uint8Array {
     // deflate takes 1–3 s on a 1500×1000 grid for at most a 2× size saving.
     files[relief.data] = [float32ToLE(bundle.reliefData[relief.id] as Float32Array), { level: 0 }];
   }
-  return zipSync(files);
+  // Fixed entry timestamps make saves byte-for-byte deterministic (the file
+  // system already records when the project was saved).
+  return zipSync(files, { mtime: ZIP_MTIME });
 }
 
 /** Decodes project .zip bytes and validates the result. */

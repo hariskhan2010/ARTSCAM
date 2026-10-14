@@ -130,6 +130,11 @@ export function clipLines(
   return fromPaths(open);
 }
 
+/** Removes vertices that deviate less than `epsilon` mm from the outline. */
+export function simplify(region: readonly (readonly Vec2[])[], epsilon: number): Region {
+  return fromPaths(Clipper.simplifyPaths(toPaths(region), epsilon * CLIP_SCALE, true));
+}
+
 /** Total signed area (mm²): outers count positive, holes negative. */
 export function regionArea(region: readonly (readonly Vec2[])[]): number {
   return region.reduce((sum, ring) => sum + signedArea(ring), 0);
