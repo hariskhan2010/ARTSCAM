@@ -11,7 +11,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - UI redesign: icons, tool hints, clearer panels.
 - Mach3, LinuxCNC and generic G-code output (same safe subset as GRBL, plus a G40 G49 G80 safety line; LinuxCNC files wrapped in %).
 - DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
-- Checks: `pnpm run ci` (lint, typecheck, 320 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (13 browser tests each).
+- Checks: `pnpm run ci` (lint, typecheck, 322 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (13 browser tests each).
 
 ## Blocked: needs you
 
