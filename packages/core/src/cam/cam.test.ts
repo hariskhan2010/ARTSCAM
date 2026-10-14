@@ -448,6 +448,17 @@ describe('GRBL post + golden files', () => {
     expect(Math.max(...xs(parsed))).toBeCloseTo(Math.max(...xs(mm)), 2);
   });
 
+  it('Mach3, LinuxCNC and generic dialects pass the checker with their own headers', () => {
+    for (const post of ['mach3', 'linuxcnc', 'generic'] as const) {
+      const p = { ...project, machine: { ...project.machine, post } };
+      const ex = exportToolpath(p, 'cutout', { simulated: true });
+      expect(ex.ok, post).toBe(true);
+      expect(ex.check.issues, post).toEqual([]);
+      expect(ex.gcode).toContain('G40 G49 G80');
+      expect(ex.gcode.startsWith('%')).toBe(post === 'linuxcnc');
+    }
+  });
+
   it('sanitises comments', () => {
     const prog = generateToolpath(project, 'holecut');
     const text = postGrbl({ ...prog, name: 'Bad (name) — ü' }, { units: 'mm' });

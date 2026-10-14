@@ -12,8 +12,17 @@ import { PRECISION, formatFixed, fromMm, roundTo } from '../model/units';
  * Every file produced here must still pass the G-code checker before export.
  */
 
+/** Controller dialects. All share the same safe G-code subset (see top of file). */
+export type PostDialect = 'grbl' | 'mach3' | 'linuxcnc' | 'generic';
+
 export interface PostOptions {
   units: Units;
+  /**
+   * Default 'grbl'. Mach3, LinuxCNC and generic add a G40 G49 G80 safety line
+   * (cancel cutter compensation, tool length offset, canned cycles); LinuxCNC
+   * files are also wrapped in % markers.
+   */
+  dialect?: PostDialect;
   /** Seconds to wait after M3 for the spindle to reach speed. Default 2; 0 disables. */
   spinUp?: number;
   /** Extra comment lines for the header. */
@@ -43,6 +52,7 @@ export function postGrbl(program: CamProgram, options: PostOptions): string {
   const feed = (mmPerMin: number) =>
     formatFixed(fromMm(mmPerMin, units), units === 'mm' ? 0 : 2, true);
   const { tool } = program;
+  const dialect = options.dialect ?? 'grbl';
   const spinUp = options.spinUp ?? 2;
 
   const lines: string[] = [
@@ -50,6 +60,7 @@ export function postGrbl(program: CamProgram, options: PostOptions): string {
     `(Tool: ${commentText(toolLabel(tool, units))}, diameter ${num(tool.diameter)} ${units === 'mm' ? 'mm' : 'in'})`,
     ...(options.notes ?? []).map((n) => `(${commentText(n)})`),
     `${units === 'mm' ? 'G21' : 'G20'} G90 G94 G17`,
+    ...(dialect === 'grbl' ? [] : ['G40 G49 G80']),
     'G54',
     `G0 Z${numZ(program.safeZ)}`,
     `M3 S${formatFixed(tool.rpm, 0)}`,
@@ -87,5 +98,9 @@ export function postGrbl(program: CamProgram, options: PostOptions): string {
   }
   if (z !== numZ(program.safeZ)) lines.push(`G0 Z${numZ(program.safeZ)}`);
   lines.push('M5', 'M30');
+  if (dialect === 'linuxcnc') {
+    lines.unshift('%');
+    lines.push('%');
+  }
   return lines.join('\n') + '\n';
 }

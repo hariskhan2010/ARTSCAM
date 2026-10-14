@@ -28,7 +28,12 @@ export interface ExportOptions {
 }
 
 /** Posts that exist; others are planned for later milestones (plan.md §4). */
-export const AVAILABLE_POSTS: readonly Project['machine']['post'][] = ['grbl'];
+export const AVAILABLE_POSTS: readonly Project['machine']['post'][] = [
+  'grbl',
+  'mach3',
+  'linuxcnc',
+  'generic',
+];
 
 export function exportToolpath(
   project: Project,
@@ -41,6 +46,7 @@ export function exportToolpath(
   }
   const gcode = postGrbl(program, {
     units: project.units,
+    dialect: project.machine.post,
     notes: program.warnings.map((w) => `Note: ${w}`),
   });
   const tool = program.tool;

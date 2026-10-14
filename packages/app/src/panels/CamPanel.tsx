@@ -644,7 +644,7 @@ function MachineSection({ store }: { store: EditorStore }) {
             label:
               p === 'grbl'
                 ? 'GRBL'
-                : `${p === 'mach3' ? 'Mach3' : p === 'linuxcnc' ? 'LinuxCNC' : 'Generic'} (coming later)`,
+                : `${p === 'mach3' ? 'Mach3' : p === 'linuxcnc' ? 'LinuxCNC' : 'Generic'}`,
             disabled: !AVAILABLE_POSTS.includes(p),
           }))}
           onChange={(post) => set({ post })}
