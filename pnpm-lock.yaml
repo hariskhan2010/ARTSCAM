@@ -38,6 +38,12 @@ importers:
 
   packages/app:
     dependencies:
+      '@fontsource/noto-naskh-arabic':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/noto-nastaliq-urdu':
+        specifier: 5.3.0
+        version: 5.3.0
       '@naqsh/core':
         specifier: workspace:*
         version: link:../core

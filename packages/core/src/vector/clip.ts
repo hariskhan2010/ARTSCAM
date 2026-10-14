@@ -130,6 +130,21 @@ export function clipLines(
   return fromPaths(open);
 }
 
+/** Parts of open polylines that lie outside a region (the complement of `clipLines`). */
+export function clipLinesOutside(
+  lines: readonly (readonly Vec2[])[],
+  region: readonly (readonly Vec2[])[],
+  fill: FillMode = 'nonZero',
+): Vec2[][] {
+  const c = new Clipper64();
+  c.addOpenSubject(toPaths(lines));
+  c.addClip(toPaths(region));
+  const closed: Paths64 = [];
+  const open: Paths64 = [];
+  c.execute(ClipType.Difference, FILL[fill], closed, open);
+  return fromPaths(open);
+}
+
 /** Removes vertices that deviate less than `epsilon` mm from the outline. */
 export function simplify(region: readonly (readonly Vec2[])[], epsilon: number): Region {
   return fromPaths(Clipper.simplifyPaths(toPaths(region), epsilon * CLIP_SCALE, true));

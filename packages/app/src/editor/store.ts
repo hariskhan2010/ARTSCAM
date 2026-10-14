@@ -1,4 +1,11 @@
-import { History, newProject, type Command, type Project } from '@naqsh/core';
+import {
+  History,
+  newProject,
+  type Command,
+  type Project,
+  type Segment,
+  type TextAlign,
+} from '@naqsh/core';
 import { useSyncExternalStore } from 'react';
 import type { View } from './geometry';
 
@@ -9,7 +16,18 @@ import type { View } from './geometry';
  */
 
 export type ToolName =
-  'select' | 'node' | 'pen' | 'rect' | 'ellipse' | 'polygon' | 'star' | 'line' | 'pan';
+  'select' | 'node' | 'pen' | 'rect' | 'ellipse' | 'polygon' | 'star' | 'line' | 'text' | 'pan';
+
+/** Text being placed with the Text tool (not part of the document until added). */
+export interface TextDraft {
+  /** Anchor in world mm: baseline of the first line; left, centre or right edge by `align`. */
+  at: [number, number];
+  text: string;
+  fontId: string;
+  /** Font size (em height) in mm. */
+  size: number;
+  align: TextAlign;
+}
 
 export interface UiState {
   tool: ToolName;
@@ -30,6 +48,9 @@ export interface UiState {
   activeToolpath: string | undefined;
   /** Tool being edited in the tool library. */
   activeTool: string | undefined;
+  textDraft: TextDraft | undefined;
+  /** Laid-out outline of the draft text (world mm), for the canvas preview. */
+  textPreview: Segment[] | undefined;
 }
 
 export class EditorStore {
@@ -55,6 +76,8 @@ export class EditorStore {
       sidebarTab: 'design',
       activeToolpath: undefined,
       activeTool: undefined,
+      textDraft: undefined,
+      textPreview: undefined,
     };
     this.history.subscribe(() => {
       this.#pruneSelection();

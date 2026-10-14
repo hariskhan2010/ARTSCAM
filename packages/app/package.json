@@ -10,9 +10,12 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json && tsc -p e2e/tsconfig.json",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "playwright test -c playwright.prod.config.ts"
   },
   "dependencies": {
+    "@fontsource/noto-naskh-arabic": "5.3.0",
+    "@fontsource/noto-nastaliq-urdu": "5.3.0",
     "@naqsh/core": "workspace:*",
     "lucide-react": "1.44.0",
     "react": "^19.3.0",

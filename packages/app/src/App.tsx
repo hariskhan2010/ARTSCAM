@@ -34,7 +34,7 @@ import { DesignPanel } from './panels/DesignPanel';
 /** Tool palette, grouped: selecting, freehand, shapes, view. */
 const TOOL_GROUPS: ToolName[][] = [
   ['select', 'node'],
-  ['pen', 'line'],
+  ['pen', 'line', 'text'],
   ['rect', 'ellipse', 'polygon', 'star'],
   ['pan'],
 ];

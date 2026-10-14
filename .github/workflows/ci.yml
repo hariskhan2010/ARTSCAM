@@ -19,3 +19,6 @@ jobs:
       - run: pnpm test:e2e
         env:
           CI: 'true'
+      - run: pnpm --filter @naqsh/app test:e2e:prod
+        env:
+          CI: 'true'

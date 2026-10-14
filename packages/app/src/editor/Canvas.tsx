@@ -229,6 +229,9 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
   const nodeSelRef = useRef<{ id: string; ref: NodeRef } | undefined>(undefined);
   const spaceRef = useRef(false);
   const closeHoverRef = useRef(false);
+  /** Text tool remembers the last font and size used. */
+  const lastFontRef = useRef('naskh');
+  const lastSizeRef = useRef(30);
   const [penCount, setPenCount] = useState(0);
   /** Canvas size in CSS px, as state so the zoom readout re-renders on resize. */
   const [size, setSize] = useState<[number, number]>([800, 600]);
@@ -352,6 +355,31 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       ctx.stroke();
     }
     ctx.setLineDash([]);
+
+    // Text being placed
+    const textDraft = store.ui.textDraft;
+    if (store.ui.tool === 'text' && textDraft) {
+      const tp = store.ui.textPreview;
+      if (tp) {
+        ctx.beginPath();
+        tracePath(ctx, v, tp, true);
+        ctx.fillStyle = 'rgba(47,111,237,0.18)';
+        ctx.fill('nonzero');
+        ctx.strokeStyle = color('--sel', '#1971c2');
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      const [ax, ay] = worldToScreen(v, textDraft.at);
+      ctx.strokeStyle = color('--sel', '#1971c2');
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(ax - 8, ay);
+      ctx.lineTo(ax + 8, ay);
+      ctx.moveTo(ax, ay - 8);
+      ctx.lineTo(ax, ay + 8);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+    }
 
     // Toolpath preview: rapids dashed red, cuts blue, darker when deeper.
     const path = camState?.preview?.path;
@@ -619,6 +647,23 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       return;
     }
 
+    if (tool === 'text') {
+      const at = snapped(p);
+      const draft = store.ui.textDraft;
+      store.setUi({
+        textDraft: draft
+          ? { ...draft, at }
+          : {
+              at,
+              text: '',
+              fontId: lastFontRef.current,
+              size: lastSizeRef.current,
+              align: 'center',
+            },
+      });
+      return;
+    }
+
     // Shape tools
     dragRef.current = { kind: 'shape', start: snapped(p) };
   };
@@ -867,6 +912,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         return;
       }
       if (e.key === 'Escape') {
+        if (store.ui.textDraft) store.setUi({ textDraft: undefined, textPreview: undefined });
         setPenCount(0);
         closeHoverRef.current = false;
         penRef.current = [];
@@ -916,6 +962,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         s: 'star',
         l: 'line',
         h: 'pan',
+        t: 'text',
       };
       const t = tools[key];
       if (t) {
@@ -932,6 +979,21 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
+
+  // Switching tools drops text that was never added.
+  useEffect(() => {
+    if (ui.tool !== 'text' && store.ui.textDraft)
+      store.setUi({ textDraft: undefined, textPreview: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.tool]);
+
+  // Remember the font and size for the next text.
+  useEffect(() => {
+    if (ui.textDraft) {
+      lastFontRef.current = ui.textDraft.fontId;
+      lastSizeRef.current = ui.textDraft.size;
+    }
+  }, [ui.textDraft]);
 
   // Switching tools abandons an unfinished pen path.
   useEffect(() => {

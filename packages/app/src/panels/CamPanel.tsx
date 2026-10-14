@@ -24,6 +24,7 @@ import {
   Route,
   ScanLine,
   SquareDashed,
+  Triangle,
   Wrench,
   X,
 } from 'lucide-react';
@@ -47,6 +48,7 @@ type Units = Project['units'];
 const TYPE_INFO: Record<Toolpath['type'], { label: string; icon: typeof Route; text: string }> = {
   profile: { label: 'Profile', icon: Route, text: 'Cut along or around shapes' },
   pocket: { label: 'Pocket', icon: SquareDashed, text: 'Clear the area inside shapes' },
+  vcarve: { label: 'V-carve', icon: Triangle, text: 'Carve lettering and art with a V-bit' },
   drill: { label: 'Drill', icon: Drill, text: 'Drill a hole at each shape’s centre' },
 };
 
@@ -396,6 +398,34 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
         </>
       );
     }
+    case 'vcarve': {
+      const p = tp.params;
+      const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
+      return (
+        <>
+          <div className="grid2">
+            <NumberField
+              label="Max depth"
+              units={u}
+              min={0.01}
+              value={p.depth}
+              testId="tp-depth"
+              help="Wide areas are cut flat at this depth; narrow strokes are as deep as their width needs"
+              onCommit={(depth) => set({ depth })}
+            />
+            <NumberField
+              label="Detail"
+              units={u}
+              min={0.01}
+              value={p.step ?? 0.1}
+              help="Spacing between carving passes. Smaller is sharper but slower."
+              onCommit={(step) => set({ step })}
+            />
+          </div>
+          {direction(p.direction, (d) => set({ direction: d }))}
+        </>
+      );
+    }
     case 'drill': {
       const p = tp.params;
       const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
@@ -458,7 +488,12 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
 
   const create = (type: Toolpath['type']) => {
     const vectors = store.ui.selection.filter((id) => doc.vectors.some((v) => v.id === id));
-    const tool = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
+    const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
+    // V-carving needs a V-bit: use one from the library when the active tool is not.
+    const tool =
+      type === 'vcarve' && active?.type !== 'vbit'
+        ? (doc.tools.find((t) => t.type === 'vbit') ?? active)
+        : active;
     if (!tool) {
       store.setUi({ message: 'Add a tool first (Tools section below)' });
       return;
@@ -473,7 +508,14 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
         ? { side: 'outside' as const, depth }
         : type === 'pocket'
           ? { depth, strategy: 'offset' as const }
-          : { depth };
+          : type === 'vcarve'
+            ? { depth: Math.min(6, doc.stock.thickness) }
+            : { depth };
+    if (type === 'vcarve' && tool.type !== 'vbit') {
+      store.setUi({
+        message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
+      });
+    }
     const name = `${TYPE_INFO[type].label} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;
     store.execute(
       addToolpath({ type, tool: tool.id, vectors, name, params } as Parameters<

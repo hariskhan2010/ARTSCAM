@@ -11,6 +11,7 @@ import {
   Spline,
   Square,
   Star,
+  Type,
   Waypoints,
   X,
   ZoomIn,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Btn } from '../panels/common';
 import { useStore, type EditorStore, type ToolName } from './store';
+import { TextEditor } from './TextEditor';
 
 /**
  * Floating help and controls over the canvas: what the active tool does and
@@ -71,6 +73,12 @@ export const TOOL_INFO: Record<
   polygon: { name: 'Polygon', icon: Hexagon, key: 'G', steps: ['Drag out from the centre'] },
   star: { name: 'Star', icon: Star, key: 'S', steps: ['Drag out from the centre'] },
   line: { name: 'Line', icon: Slash, key: 'L', steps: ['Drag to draw a straight line'] },
+  text: {
+    name: 'Text',
+    icon: Type,
+    key: 'T',
+    steps: ['Click where the text should start', 'Type in Urdu, Arabic or English'],
+  },
   pan: { name: 'Pan', icon: Hand, key: 'H', steps: ['Drag to move the view', 'Scroll to zoom'] },
 };
 
@@ -134,6 +142,7 @@ export function CanvasOverlay(props: {
             </span>
           </div>
         )}
+        {ui.tool === 'text' && <TextEditor store={store} />}
         {drawingPen && (
           <div className="row">
             <Btn
