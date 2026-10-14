@@ -22,7 +22,10 @@ export interface PostOptions {
 
 /** Parentheses would end/nest a G-code comment; non-ASCII may upset senders. */
 export function commentText(text: string): string {
-  return text.replace(/[()]/g, (c) => (c === '(' ? '[' : ']')).replace(/[^\x20-\x7e]/g, '?');
+  return text
+    .replace(/[()]/g, (c) => (c === '(' ? '[' : ']'))
+    .replace(/°/g, ' deg')
+    .replace(/[^\x20-\x7e]/g, '?');
 }
 
 export function postGrbl(program: CamProgram, options: PostOptions): string {

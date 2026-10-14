@@ -3,6 +3,7 @@ import type { Project, Toolpath, Vector } from '../model/schema';
 import { PathBuilder } from './builder';
 import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
+import { emitVcarve } from './vcarve';
 import { emitProfile, profileContours } from './profile';
 import { toolLabel, toolProblems } from './tools';
 import type { CamProgram } from './types';
@@ -63,6 +64,14 @@ export function generate(project: Project, tp: Toolpath, tolerance = CAM_TOLERAN
       break;
     case 'pocket':
       emitPocket(b, pocketRegion(vectors, tolerance, warnings), tool, tp.params, warnings);
+      break;
+    case 'vcarve':
+      if (tool.type !== 'vbit') {
+        warnings.push(
+          `V-carving needs a V-bit; ${toolLabel(tool)} will be rejected by the checker`,
+        );
+      }
+      emitVcarve(b, pocketRegion(vectors, tolerance, warnings), tool, tp.params, warnings);
       break;
     case 'drill':
       if (tool.type === 'vbit' || tool.type === 'ballnose') {

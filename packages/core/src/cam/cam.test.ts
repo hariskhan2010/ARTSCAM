@@ -39,6 +39,7 @@ function camProject(units: Project['units'] = 'mm'): Project {
     { id: 'd2', layer: 'L1', closed: true, segments: ellipse(80, 160, 2.5) },
     { id: 'd3', layer: 'L1', closed: true, segments: ellipse(120, 170, 2.5) },
     { id: 'groove', layer: 'L1', closed: false, segments: line([160, 150], [280, 180]) },
+    { id: 'vbar', layer: 'L1', closed: true, segments: rectangle(20, 100, 60, 8) },
   ]).apply(p);
   p = addTool({ id: 'em6', ...TOOL_PRESETS[3]! }).apply(p); // 6 mm flat
   p = addTool({ id: 'em3', ...TOOL_PRESETS[2]! }).apply(p); // 3 mm flat
@@ -88,6 +89,14 @@ function camProject(units: Project['units'] = 'mm'): Project {
       tool: 'em3',
       vectors: ['d1', 'd2', 'd3'],
       params: { depth: 10, peck: 3, dwell: 0.5 },
+    },
+    {
+      id: 'vcarve',
+      name: 'V-carve bar',
+      type: 'vcarve',
+      tool: 'v90',
+      vectors: ['vbar'],
+      params: { depth: 5, step: 0.25 },
     },
     {
       id: 'groove',

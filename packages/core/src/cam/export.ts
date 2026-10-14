@@ -45,7 +45,7 @@ export function exportToolpath(
   });
   const tool = program.tool;
   const tp = project.toolpaths.find((t) => t.id === toolpathId);
-  const allowance = tp?.type === 'drill' ? 0 : (tp?.params.allowance ?? 0);
+  const allowance = tp && 'allowance' in tp.params ? (tp.params.allowance ?? 0) : 0;
   const check = checkGcode(gcode, {
     machine: project.machine,
     stock: project.stock,

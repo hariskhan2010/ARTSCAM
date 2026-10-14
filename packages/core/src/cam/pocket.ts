@@ -34,7 +34,7 @@ export function pocketRegion(
 }
 
 /** Rotates a ring list so each ring starts at its vertex nearest to `from`. */
-function startNearest(ring: Vec2[], from: Vec2 | undefined): Vec2[] {
+export function startNearest(ring: Vec2[], from: Vec2 | undefined): Vec2[] {
   if (!from || ring.length === 0) return ring;
   let best = 0;
   let bestD = Infinity;
@@ -49,7 +49,7 @@ function startNearest(ring: Vec2[], from: Vec2 | undefined): Vec2[] {
 }
 
 /** True when the straight move a→b stays inside the tool-centre region. */
-function linkInside(a: Vec2, b: Vec2, centres: Region): boolean {
+export function linkInside(a: Vec2, b: Vec2, centres: Region): boolean {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if (len < 1e-9) return true;
   const inside = clipLines([[a, b]], centres);

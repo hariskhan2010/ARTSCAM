@@ -140,6 +140,20 @@ export const toolpathSchema = z.discriminatedUnion('type', [
   z.strictObject({
     id,
     name: z.string().optional(),
+    type: z.literal('vcarve'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      /** Deepest cut (mm); wider areas get a flat bottom here. Default: the bit's full cone depth. */
+      depth: positive,
+      /** Spacing (mm) between carving rings. Smaller is truer to the ideal V surface. Default 0.1. */
+      step: positive.optional(),
+      direction: cutDirection.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
     type: z.literal('drill'),
     tool: id,
     vectors: z.array(id).min(1),

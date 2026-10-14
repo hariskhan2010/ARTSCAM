@@ -1,5 +1,5 @@
 (V groove)
-(Tool: 90? V-bit, 1/2", diameter 12.7 mm)
+(Tool: 90 deg V-bit, 1/2", diameter 12.7 mm)
 G21 G90 G94 G17
 G54
 G0 Z5
