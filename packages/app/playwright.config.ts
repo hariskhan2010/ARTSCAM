@@ -17,7 +17,8 @@ export default defineConfig({
   webServer: {
     command: 'pnpm exec vite --port 5174 --strictPort',
     url: 'http://localhost:5174',
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a stale server on this port once served an old build to the tests.
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });

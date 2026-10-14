@@ -37,7 +37,7 @@ export function profileContours(
     const polys = flatten(v.segments, tolerance, v.closed);
     if (params.side === 'on' || !v.closed) {
       if (params.side !== 'on')
-        warnings.push(`Vector ${v.id} is open; cut on the line instead of ${params.side}`);
+        warnings.push(`An open shape (${v.id}) has no ${params.side}, so it is cut on the line`);
       for (const p of polys)
         if (p.points.length >= 2) out.push({ points: p.points, closed: p.closed, vector: v.id });
       continue;
@@ -48,7 +48,9 @@ export function profileContours(
       params.side === 'outside' ? d : -d,
     );
     if (rings.length === 0) {
-      warnings.push(`Vector ${v.id} is too small for this tool inside; skipped`);
+      warnings.push(
+        `A shape (${v.id}) is too small for this tool to cut inside, so it was skipped`,
+      );
       continue;
     }
     const reverse = params.side === 'outside' ? climb : !climb;

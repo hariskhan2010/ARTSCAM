@@ -18,7 +18,8 @@ import {
   type Vec2,
   type Vector,
 } from '@naqsh/core';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { CanvasOverlay } from './CanvasOverlay';
 import {
   anchorPoints,
   boxFrom,
@@ -53,8 +54,16 @@ import { useStore, type EditorStore } from './store';
 
 /** Hit radius in screen pixels. */
 const HIT_PX = 6;
+/**
+ * Grab radius for points: at least the snap radius (HIT_PX × 1.5), so a point
+ * that snapped away from the click can still be picked up where you clicked.
+ */
+const POINT_HIT_PX = 10;
 const HANDLE_PX = 4;
 const ROTATE_PX = 24;
+/** Fit-view margins (px); the top one leaves room for the tool hint card. */
+const FIT_MARGIN = 40;
+const FIT_TOP = 120;
 
 /** What the current pointer drag is doing. */
 type Drag =
@@ -219,6 +228,10 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
   const penRef = useRef<PenNode[]>([]);
   const nodeSelRef = useRef<{ id: string; ref: NodeRef } | undefined>(undefined);
   const spaceRef = useRef(false);
+  const closeHoverRef = useRef(false);
+  const [penCount, setPenCount] = useState(0);
+  /** Canvas size in CSS px, as state so the zoom readout re-renders on resize. */
+  const [size, setSize] = useState<[number, number]>([800, 600]);
   const sizeRef = useRef<[number, number]>([800, 600]);
 
   const ui = store.ui;
@@ -230,6 +243,8 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       { minX: 0, minY: 0, maxX: store.doc.stock.width, maxY: store.doc.stock.height },
       w,
       h,
+      FIT_MARGIN,
+      FIT_TOP,
     );
   };
 
@@ -368,9 +383,20 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     }
     if (store.ui.tool === 'pen') {
       ctx.fillStyle = color('--sel', '#1971c2');
-      for (const n of penRef.current) {
+      penRef.current.forEach((n, i) => {
         const [x, y] = worldToScreen(v, n.p);
-        ctx.fillRect(x - 3, y - 3, 6, 6);
+        const r = i === 0 ? 4.5 : 3;
+        ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+      });
+      const first = penRef.current[0];
+      if (first && closeHoverRef.current) {
+        const [x, y] = worldToScreen(v, first.p);
+        ctx.strokeStyle = color('--sel', '#1971c2');
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.lineWidth = 1.5;
       }
     }
 
@@ -467,6 +493,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       const r = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
       sizeRef.current = [r.width, r.height];
+      setSize([r.width, r.height]);
       canvas.width = Math.round(r.width * dpr);
       canvas.height = Math.round(r.height * dpr);
       draw();
@@ -497,6 +524,8 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     const nodes = penRef.current;
     penRef.current = [];
     previewRef.current = undefined;
+    closeHoverRef.current = false;
+    setPenCount(0);
     if (nodes.length >= 2) {
       store.execute(
         addVectors(
@@ -556,7 +585,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
 
     if (tool === 'node') {
       for (const vec of visibleVectors().filter((x) => store.ui.selection.includes(x.id))) {
-        const hit = pickPoint(editPoints(vec.segments), p, tol);
+        const hit = pickPoint(editPoints(vec.segments), p, POINT_HIT_PX / v.scale);
         if (hit) {
           nodeSelRef.current = { id: vec.id, ref: { seg: hit.seg, key: hit.key } };
           dragRef.current = { kind: 'node', id: vec.id, ref: { seg: hit.seg, key: hit.key } };
@@ -583,6 +612,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         return;
       }
       nodes.push({ p: q });
+      setPenCount(nodes.length);
       dragRef.current = { kind: 'pen', node: nodes.length - 1 };
       previewRef.current = { kind: 'draft', segments: penSegments(nodes, false), closed: false };
       draw();
@@ -599,10 +629,17 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       store.setUi({ cursor: p });
       if (store.ui.tool === 'pen' && penRef.current.length > 0) {
         const q = snapped(p);
+        const nodes = penRef.current;
+        const first = nodes[0] as PenNode;
+        // Near the first point: show the closed shape the next click would make.
+        const closing =
+          nodes.length > 2 &&
+          Math.hypot(first.p[0] - q[0], first.p[1] - q[1]) <= (HIT_PX * 1.5) / view().scale;
+        closeHoverRef.current = closing;
         previewRef.current = {
           kind: 'draft',
-          segments: penSegments([...penRef.current, { p: q }], false),
-          closed: false,
+          segments: closing ? penSegments(nodes, true) : penSegments([...nodes, { p: q }], false),
+          closed: closing,
         };
         draw();
       }
@@ -764,7 +801,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     if (store.ui.tool === 'node') {
       for (const vec of visibleVectors().filter((x) => store.ui.selection.includes(x.id))) {
         const near = nearestSegment(vec.segments, p, tol);
-        if (near && !pickPoint(editPoints(vec.segments), p, tol)) {
+        if (near && !pickPoint(editPoints(vec.segments), p, POINT_HIT_PX / view().scale)) {
           store.execute(
             setVectorSegments(
               vec.id,
@@ -830,6 +867,8 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         return;
       }
       if (e.key === 'Escape') {
+        setPenCount(0);
+        closeHoverRef.current = false;
         penRef.current = [];
         previewRef.current = undefined;
         nodeSelRef.current = undefined;
@@ -894,21 +933,73 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
 
+  // Switching tools abandons an unfinished pen path.
+  useEffect(() => {
+    if (ui.tool !== 'pen' && penRef.current.length) {
+      penRef.current = [];
+      previewRef.current = undefined;
+      closeHoverRef.current = false;
+      setPenCount(0);
+    }
+  }, [ui.tool]);
+
+  const cancelPen = () => {
+    penRef.current = [];
+    previewRef.current = undefined;
+    closeHoverRef.current = false;
+    setPenCount(0);
+    draw();
+  };
+
   const cursor = ui.tool === 'pan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
+  const zoomBy = (factor: number) => {
+    const [w, h] = sizeRef.current;
+    store.setUi({ view: zoomAt(view(), [w / 2, h / 2], factor) });
+  };
+  const [w0, h0] = size;
+  const fitScale = fitView(
+    { minX: 0, minY: 0, maxX: store.doc.stock.width, maxY: store.doc.stock.height },
+    w0,
+    h0,
+    FIT_MARGIN,
+    FIT_TOP,
+  ).scale;
+
   return (
-    <canvas
-      ref={canvasRef}
-      data-testid="canvas"
-      tabIndex={0}
-      className="canvas"
-      style={{ cursor }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerLeave={() => store.setUi({ cursor: undefined })}
-      onDoubleClick={onDoubleClick}
-      onWheel={onWheel}
-      onContextMenu={(e) => e.preventDefault()}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        data-testid="canvas"
+        tabIndex={0}
+        className="canvas"
+        style={{ cursor }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={() => {
+          if (penRef.current.length && !dragRef.current) {
+            closeHoverRef.current = false;
+            previewRef.current = {
+              kind: 'draft',
+              segments: penSegments(penRef.current, false),
+              closed: false,
+            };
+            draw();
+          }
+          store.setUi({ cursor: undefined });
+        }}
+        onDoubleClick={onDoubleClick}
+        onWheel={onWheel}
+        onContextMenu={(e) => e.preventDefault()}
+      />
+      <CanvasOverlay
+        store={store}
+        penCount={penCount}
+        onFinishPen={finishPen}
+        onCancelPen={cancelPen}
+        zoomPercent={Math.round(((store.ui.view?.scale ?? fitScale) / fitScale) * 100)}
+        onZoom={zoomBy}
+      />
+    </>
   );
 }

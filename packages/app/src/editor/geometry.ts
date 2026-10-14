@@ -53,16 +53,18 @@ export function zoomAt(v: View, at: Vec2, factor: number): View {
 }
 
 /** View that fits a world box into a screen of the given size with a margin (px). */
-export function fitView(box: BBox, width: number, height: number, margin = 40): View {
+export function fitView(box: BBox, width: number, height: number, margin = 40, top = margin): View {
   const w = Math.max(box.maxX - box.minX, 1e-3);
   const h = Math.max(box.maxY - box.minY, 1e-3);
   const scale = Math.min(
     MAX_SCALE,
-    Math.max(MIN_SCALE, Math.min((width - 2 * margin) / w, (height - 2 * margin) / h)),
+    Math.max(MIN_SCALE, Math.min((width - 2 * margin) / w, (height - margin - top) / h)),
   );
   const cx = (box.minX + box.maxX) / 2;
   const cy = (box.minY + box.maxY) / 2;
-  return { scale, originX: width / 2 - cx * scale, originY: height / 2 + cy * scale };
+  // Centre in the area below the top margin.
+  const midY = top + (height - margin - top) / 2;
+  return { scale, originX: width / 2 - cx * scale, originY: midY + cy * scale };
 }
 
 /** A "nice" grid step (1, 2, 5 × 10ⁿ mm) so lines are at least `minPx` apart. */
@@ -89,7 +91,12 @@ export interface Snapped {
   kind: 'none' | 'grid' | 'point';
 }
 
-/** Snaps to the nearest candidate point within radius, else to the grid. */
+/**
+ * Snaps to the nearest candidate point within radius. Otherwise, with grid
+ * snapping on, each axis locks to a grid line only when it is within the
+ * radius of one, and is else rounded to a tenth of the grid step: values stay
+ * tidy without the cursor jumping a whole grid cell.
+ */
 export function snap(p: Vec2, o: SnapOptions): Snapped {
   let best: Vec2 | undefined;
   let bestD = o.radius;
@@ -103,7 +110,19 @@ export function snap(p: Vec2, o: SnapOptions): Snapped {
   if (best) return { point: [best[0], best[1]], kind: 'point' };
   if (o.grid && o.gridSize > 0) {
     const g = o.gridSize;
-    return { point: [Math.round(p[0] / g) * g, Math.round(p[1] / g) * g], kind: 'grid' };
+    const fine = g / 10;
+    let locked = false;
+    const axis = (v: number) => {
+      const line = Math.round(v / g) * g;
+      if (Math.abs(line - v) <= o.radius) {
+        locked = true;
+        return line;
+      }
+      // Round on the decimal representation so 0.1-steps stay exact (e.g. 12.3, not 12.300000001).
+      return Number((Math.round(v / fine) * fine).toFixed(10));
+    };
+    const point: [number, number] = [axis(p[0]), axis(p[1])];
+    return { point, kind: locked ? 'grid' : 'none' };
   }
   return { point: [p[0], p[1]], kind: 'none' };
 }

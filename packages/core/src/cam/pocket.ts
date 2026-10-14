@@ -25,7 +25,7 @@ export function pocketRegion(
   const rings: Vec2[][] = [];
   for (const v of vectors) {
     if (!v.closed) {
-      warnings.push(`Vector ${v.id} is open and cannot be pocketed; skipped`);
+      warnings.push(`An open shape (${v.id}) was skipped: only closed shapes can be pocketed`);
       continue;
     }
     for (const p of flatten(v.segments, tolerance, true)) rings.push(p.points);

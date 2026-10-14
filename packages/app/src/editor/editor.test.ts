@@ -50,10 +50,18 @@ describe('view', () => {
 });
 
 describe('snap', () => {
-  it('prefers points within radius, then grid', () => {
-    const opts = { grid: true, gridSize: 5, points: [[11, 11]] as [number, number][], radius: 1 };
+  const opts = { grid: true, gridSize: 5, points: [[11, 11]] as [number, number][], radius: 1 };
+
+  it('prefers points within radius', () => {
     expect(snap([10.5, 10.4], opts)).toEqual({ point: [11, 11], kind: 'point' });
-    expect(snap([7.4, 2.6], opts)).toEqual({ point: [5, 5], kind: 'grid' });
+  });
+
+  it('locks an axis to a grid line only when close to it', () => {
+    expect(snap([5.6, 2.6], opts)).toEqual({ point: [5, 2.5], kind: 'grid' });
+  });
+
+  it('otherwise rounds to a tenth of the grid step, without jumping', () => {
+    expect(snap([7.4, 2.63], opts)).toEqual({ point: [7.5, 2.5], kind: 'none' });
     expect(snap([7.4, 2.6], { ...opts, grid: false })).toEqual({ point: [7.4, 2.6], kind: 'none' });
   });
 });

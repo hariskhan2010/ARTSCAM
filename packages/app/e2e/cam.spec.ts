@@ -25,7 +25,7 @@ test('M2 flow: tool → profile → simulate → export, blocked until simulated
   await page.getByTestId('tp-depth').fill('6');
   await page.getByTestId('tp-depth').press('Enter');
 
-  await expect(page.getByTestId('tp-estimate')).toContainText('Time');
+  await expect(page.getByTestId('tp-estimate')).toContainText('Estimated time');
   await expect(page.getByTestId('sim-state')).toHaveText('Not simulated');
   await expect(page.getByTestId('export-nc')).toBeDisabled();
 
@@ -44,7 +44,7 @@ test('M2 flow: tool → profile → simulate → export, blocked until simulated
   await expect(page.getByTestId('message')).toContainText('checker passed');
 
   // Any edit re-locks export until simulated again.
-  await page.getByTestId('tp-side').selectOption('inside');
+  await page.getByTestId('tp-side').locator('[data-value="inside"]').click();
   await expect(page.getByTestId('sim-state')).toHaveText('Not simulated');
   await expect(page.getByTestId('export-nc')).toBeDisabled();
 });
@@ -59,7 +59,7 @@ test('checker errors block export even after simulation', async ({ page }) => {
   // Deeper than the 18 mm stock.
   await page.getByTestId('tp-depth').fill('25');
   await page.getByTestId('tp-depth').press('Enter');
-  await expect(page.getByTestId('tp-issues')).toContainText('depth');
+  await expect(page.getByTestId('tp-issues')).toContainText('below the lowest allowed');
   await page.getByTestId('simulate').click();
   await expect(page.getByTestId('sim-state')).toHaveText('Simulated');
   await expect(page.getByTestId('export-nc')).toBeDisabled();

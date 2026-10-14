@@ -10,25 +10,33 @@ import {
   saveProject,
   PRECISION,
 } from '@naqsh/core';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import {
+  FileDown,
+  FilePlus,
+  FileUp,
+  FolderOpen,
+  Redo2,
+  Save,
+  Shapes,
+  Route,
+  Undo2,
+} from 'lucide-react';
+import { useEffect, useMemo } from 'react';
 import { CamRunner } from './cam/runner';
 import { Canvas } from './editor/Canvas';
+import { TOOL_INFO } from './editor/CanvasOverlay';
 import { useStore, EditorStore, type ToolName } from './editor/store';
 import { download, pickFile } from './files';
 import { CamPanel } from './panels/CamPanel';
+import { Btn } from './panels/common';
 import { DesignPanel } from './panels/DesignPanel';
-import { appTitle } from './title';
 
-const TOOLS: { id: ToolName; label: string; key: string; icon: string }[] = [
-  { id: 'select', label: 'Select / transform', key: 'V', icon: '↖' },
-  { id: 'node', label: 'Edit nodes', key: 'N', icon: '◇' },
-  { id: 'pen', label: 'Pen (click = corner, drag = curve, Enter = finish)', key: 'P', icon: '✒' },
-  { id: 'rect', label: 'Rectangle (Shift = square)', key: 'R', icon: '▭' },
-  { id: 'ellipse', label: 'Ellipse (Shift = circle)', key: 'E', icon: '◯' },
-  { id: 'polygon', label: 'Polygon', key: 'G', icon: '⬡' },
-  { id: 'star', label: 'Star', key: 'S', icon: '☆' },
-  { id: 'line', label: 'Line', key: 'L', icon: '╱' },
-  { id: 'pan', label: 'Pan (or Space / middle-drag)', key: 'H', icon: '✋' },
+/** Tool palette, grouped: selecting, freehand, shapes, view. */
+const TOOL_GROUPS: ToolName[][] = [
+  ['select', 'node'],
+  ['pen', 'line'],
+  ['rect', 'ellipse', 'polygon', 'star'],
+  ['pan'],
 ];
 
 async function openProject(store: EditorStore) {
@@ -81,25 +89,6 @@ function exportSvgFile(store: EditorStore) {
   download('design.svg', text, 'image/svg+xml');
 }
 
-function Button(props: {
-  onClick: () => void;
-  children: ReactNode;
-  title?: string;
-  disabled?: boolean;
-  testId?: string;
-}) {
-  return (
-    <button
-      onClick={props.onClick}
-      title={props.title}
-      disabled={props.disabled}
-      data-testid={props.testId}
-    >
-      {props.children}
-    </button>
-  );
-}
-
 export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
   const runner = useMemo(() => new CamRunner(() => store.touch()), [store]);
@@ -107,116 +96,107 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
   useStore(store);
   const { ui, doc, history } = store;
   const fmt = (mm: number) => formatFixed(fromMm(mm, doc.units), PRECISION[doc.units].display);
+  const unit = doc.units === 'mm' ? 'mm' : 'in';
 
   return (
     <div className="app">
       <header className="topbar">
-        <strong className="brand">{appTitle()}</strong>
-        <nav>
-          <Button onClick={() => confirmNew(store)} title="New project">
-            New
-          </Button>
-          <Button onClick={() => void openProject(store)} title="Open a project .zip">
-            Open
-          </Button>
-          <Button
-            onClick={() => saveProjectFile(store)}
-            title="Save the project as .zip"
-            testId="save"
-          >
-            Save
-          </Button>
-          <span className="sep" />
-          <Button
-            onClick={() => void importVectors(store)}
-            title="Import SVG or DXF"
-            testId="import"
-          >
-            Import
-          </Button>
-          <Button
-            onClick={() => exportSvgFile(store)}
-            title="Export visible vectors as SVG"
-            testId="export-svg"
-          >
-            Export SVG
-          </Button>
-          <span className="sep" />
-          <Button
-            onClick={() => store.undo()}
-            disabled={!history.canUndo}
-            title={`Undo ${history.undoLabel ?? ''} (Ctrl+Z)`}
-            testId="undo"
-          >
-            Undo
-          </Button>
-          <Button
-            onClick={() => store.redo()}
-            disabled={!history.canRedo}
-            title={`Redo ${history.redoLabel ?? ''} (Ctrl+Y)`}
-            testId="redo"
-          >
-            Redo
-          </Button>
-          <span className="sep" />
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={ui.snapGrid}
-              onChange={(e) => store.setUi({ snapGrid: e.target.checked })}
-            />{' '}
-            Snap grid
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={ui.snapPoints}
-              onChange={(e) => store.setUi({ snapPoints: e.target.checked })}
-            />{' '}
-            Snap nodes
-          </label>
-          <Button onClick={() => store.setUi({ view: undefined })} title="Fit the stock in view">
-            Fit
-          </Button>
-        </nav>
+        <div className="brand">
+          <span className="brand-mark" aria-hidden>
+            <Route size={16} />
+          </span>
+          Naqsh <small>beta</small>
+        </div>
+        <Btn
+          icon={FilePlus}
+          label="New"
+          variant="ghost"
+          onClick={() => confirmNew(store)}
+          title="Start a new project"
+        />
+        <Btn
+          icon={FolderOpen}
+          label="Open"
+          variant="ghost"
+          onClick={() => void openProject(store)}
+          title="Open a project file (.zip)"
+        />
+        <Btn
+          icon={Save}
+          label="Save"
+          variant="ghost"
+          onClick={() => saveProjectFile(store)}
+          title="Save the project as a .zip file"
+          testId="save"
+        />
+        <span className="divider" />
+        <Btn
+          icon={FileUp}
+          label="Import"
+          variant="ghost"
+          onClick={() => void importVectors(store)}
+          title="Import shapes from an SVG or DXF file"
+          testId="import"
+        />
+        <Btn
+          icon={FileDown}
+          label="Export SVG"
+          variant="ghost"
+          onClick={() => exportSvgFile(store)}
+          title="Export the visible shapes as SVG"
+          testId="export-svg"
+        />
+        <span className="divider" />
+        <Btn
+          icon={Undo2}
+          variant="ghost"
+          onClick={() => store.undo()}
+          disabled={!history.canUndo}
+          title={history.undoLabel ? `Undo ${history.undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
+          testId="undo"
+        />
+        <Btn
+          icon={Redo2}
+          variant="ghost"
+          onClick={() => store.redo()}
+          disabled={!history.canRedo}
+          title={history.redoLabel ? `Redo ${history.redoLabel} (Ctrl+Y)` : 'Nothing to redo'}
+          testId="redo"
+        />
       </header>
 
-      <aside className="toolbox" aria-label="Tools">
-        {TOOLS.map((t) => (
-          <button
-            key={t.id}
-            className={ui.tool === t.id ? 'tool active' : 'tool'}
-            title={`${t.label} (${t.key})`}
-            aria-pressed={ui.tool === t.id}
-            data-testid={`tool-${t.id}`}
-            onClick={() => store.setUi({ tool: t.id })}
-          >
-            <span aria-hidden>{t.icon}</span>
-          </button>
+      <nav className="toolbox" aria-label="Drawing tools">
+        {TOOL_GROUPS.map((group, gi) => (
+          <div key={gi} style={{ display: 'contents' }}>
+            {gi > 0 && <hr />}
+            {group.map((id) => {
+              const t = TOOL_INFO[id];
+              const Icon = t.icon;
+              return (
+                <button
+                  key={id}
+                  className={ui.tool === id ? 'tool active' : 'tool'}
+                  data-tip={`${t.name}  (${t.key})`}
+                  aria-label={t.name}
+                  aria-pressed={ui.tool === id}
+                  data-testid={`tool-${id}`}
+                  onClick={() => store.setUi({ tool: id })}
+                >
+                  <Icon size={18} aria-hidden />
+                  <kbd aria-hidden>{t.key}</kbd>
+                </button>
+              );
+            })}
+          </div>
         ))}
-        {(ui.tool === 'polygon' || ui.tool === 'star') && (
-          <label className="sides" title={ui.tool === 'star' ? 'Points' : 'Sides'}>
-            <input
-              type="number"
-              min={ui.tool === 'star' ? 2 : 3}
-              max={64}
-              value={ui.sides}
-              onChange={(e) =>
-                store.setUi({
-                  sides: Math.max(2, Math.min(64, Math.round(Number(e.target.value) || 3))),
-                })
-              }
-            />
-          </label>
-        )}
-      </aside>
+      </nav>
 
       <main className="stage">
         <Canvas store={store} runner={runner} />
       </main>
 
       <aside className="sidebar">
-        <div className="tabs" role="tablist">
+        <div className="steps" role="tablist" aria-label="Workflow">
           <button
             role="tab"
             aria-selected={ui.sidebarTab === 'design'}
@@ -224,7 +204,8 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
             onClick={() => store.setUi({ sidebarTab: 'design' })}
             data-testid="tab-design"
           >
-            Design
+            <span className="num">1</span>
+            <Shapes size={15} aria-hidden /> Design
           </button>
           <button
             role="tab"
@@ -233,7 +214,8 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
             onClick={() => store.setUi({ sidebarTab: 'cam' })}
             data-testid="tab-cam"
           >
-            Toolpaths
+            <span className="num">2</span>
+            <Route size={15} aria-hidden /> Toolpaths
           </button>
         </div>
         {ui.sidebarTab === 'design' ? (
@@ -244,13 +226,13 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
       </aside>
 
       <footer className="status">
+        <span className="coords">
+          {ui.cursor
+            ? `X ${fmt(ui.cursor[0])}   Y ${fmt(ui.cursor[1])} ${unit}`
+            : 'Move over the canvas'}
+        </span>
         <span data-testid="vector-count">{doc.vectors.length} vectors</span>
         <span>{ui.selection.length} selected</span>
-        <span>
-          {ui.cursor
-            ? `X ${fmt(ui.cursor[0])}  Y ${fmt(ui.cursor[1])} ${doc.units === 'mm' ? 'mm' : 'in'}`
-            : ''}
-        </span>
         <span className="message" role="status" data-testid="message">
           {ui.message}
         </span>

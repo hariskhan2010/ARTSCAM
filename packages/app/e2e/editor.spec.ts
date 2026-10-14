@@ -100,6 +100,28 @@ test('pen draws a closed curved path, node tool edits it', async ({ page }) => {
   await expect(page.getByTestId('undo')).toHaveAttribute('title', /Pen/);
 });
 
+test('pen shows how to finish, and Cancel / Finish work', async ({ page }) => {
+  await page.getByTestId('tool-pen').click();
+  await expect(page.getByTestId('tool-hint')).toContainText('Click the first point to close');
+  await click(page, [300, 300]);
+  await click(page, [400, 300]);
+  await expect(page.getByTestId('pen-count')).toHaveText('2 points');
+  await page.getByTestId('pen-cancel').click();
+  await expect(page.getByTestId('pen-count')).toHaveCount(0);
+  await expect(count(page)).toHaveText('0 vectors');
+
+  await click(page, [300, 300]);
+  await click(page, [400, 300]);
+  await click(page, [400, 380]);
+  await page.getByTestId('pen-finish').click();
+  await expect(count(page)).toHaveText('1 vectors');
+
+  // Switching tools drops an unfinished path.
+  await click(page, [200, 200]);
+  await page.getByTestId('tool-rect').click();
+  await expect(page.getByTestId('pen-count')).toHaveCount(0);
+});
+
 test('zoom and pan keep the editor responsive', async ({ page }) => {
   const box = (await page.getByTestId('canvas').boundingBox())!;
   await page.mouse.move(box.x + 300, box.y + 300);

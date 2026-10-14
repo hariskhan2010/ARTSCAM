@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@naqsh/core": "workspace:*",
+    "lucide-react": "1.44.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
