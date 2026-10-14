@@ -19,6 +19,8 @@ See `plan.md` for the full spec and `CLAUDE.md` for working rules.
 2. **Toolpaths**: add a tool from the presets, select shapes, then pick **Profile**, **Pocket**, **V-carve** (needs a V-bit) or **Drill**. Adjust depth, tabs, ramp and so on.
 3. **Simulate**, check the time estimate and safety check, then **Export G-code**. Export stays disabled until the current settings have been simulated and the G-code checker finds no errors.
 
+The built app works offline after the first visit and can be installed from the browser.
+
 Before cutting real material, air-cut first (Z raised), then foam or soft wood (plan.md §13).
 
 ## Develop

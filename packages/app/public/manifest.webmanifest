@@ -1,0 +1,11 @@
+{
+  "name": "Naqsh — relief carving CAD/CAM",
+  "short_name": "Naqsh",
+  "description": "Design, toolpaths, simulation and G-code for CNC routers. Works offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4f7",
+  "theme_color": "#2f6fed",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

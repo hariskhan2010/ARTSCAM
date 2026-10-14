@@ -11,7 +11,8 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - UI redesign: icons, tool hints, clearer panels.
 - Mach3, LinuxCNC and generic G-code output (same safe subset as GRBL, plus a G40 G49 G80 safety line; LinuxCNC files wrapped in %).
 - DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
-- Checks: `pnpm run ci` (lint, typecheck, 322 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (13 browser tests each).
+- Offline mode (PWA): installable; after one visit the whole app, including fonts and text shaping, works with no server. Tested by shutting the server down.
+- Checks: `pnpm run ci` (lint, typecheck, 322 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (13 browser tests on dev; 14 on the production build, including offline).
 
 ## Blocked: needs you
 
@@ -27,7 +28,6 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 
 - **Text** becomes a shape when added, so it can't be edited afterwards (delete and retype). Bidi is simplified (fine for signs). WOFF2 fonts aren't supported. There is no text on a curve (P2).
 - **V-carve:** flat bottoms are cut with the V-bit itself; there is no separate flat clearing tool. A 70 mm word takes about 18 min. It could be faster with a true medial-axis path or fewer depth passes.
-- **Not started from plan §4 P1:** PWA offline mode (installable app that works without internet).
 - **Other §4 gaps:** trace bitmap, mirror/array/nesting (P2).
 - The dev server is started by hand with `pnpm dev`.
 

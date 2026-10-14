@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { serviceWorker } from './src/sw-plugin';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), serviceWorker()],
   server: { port: 5173 },
   // HarfBuzz finds its .wasm next to its own module; pre-bundling would move it.
   optimizeDeps: { exclude: ['harfbuzzjs'] },
