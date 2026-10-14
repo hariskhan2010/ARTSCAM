@@ -7,3 +7,5 @@ export * from './model/units';
 export * from './model/history';
 export * from './gcode/parser';
 export * from './gcode/checker';
+export * from './vector/path';
+export * from './vector/flatten';
