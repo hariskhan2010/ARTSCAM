@@ -35,6 +35,8 @@ export class CamRunner {
 
   constructor(
     private readonly onChange: () => void,
+    /** Relief images, read on every request (they can be added at any time). */
+    private readonly getImages: () => Record<string, Uint8Array> = () => ({}),
     private readonly createWorker: () => Worker = () =>
       new Worker(new URL('./cam.worker.ts', import.meta.url), { type: 'module' }),
   ) {}
@@ -72,7 +74,12 @@ export class CamRunner {
     const cur = this.state.get(tpId);
     if (!key || (cur && cur.key === key && (cur.preview || cur.error || cur.busy))) return;
     this.#patch(tpId, { key, busy: 'preview' });
-    const res = await this.#call({ kind: 'preview', project, toolpathId: tpId });
+    const res = await this.#call({
+      kind: 'preview',
+      project,
+      toolpathId: tpId,
+      images: this.getImages(),
+    });
     const now = this.state.get(tpId);
     if (now?.key !== key) return; // superseded by a newer edit
     this.#patch(
@@ -86,7 +93,12 @@ export class CamRunner {
   async simulate(project: Project, tpId: string): Promise<void> {
     const key = toolpathKey(project, tpId);
     this.#patch(tpId, { busy: 'simulate' });
-    const res = await this.#call({ kind: 'simulate', project, toolpathId: tpId });
+    const res = await this.#call({
+      kind: 'simulate',
+      project,
+      toolpathId: tpId,
+      images: this.getImages(),
+    });
     if (res.ok && res.kind === 'simulate')
       this.#patch(tpId, { sim: { ...res.result, key }, busy: undefined });
     else if (!res.ok) this.#patch(tpId, { error: res.error, busy: undefined });
@@ -99,6 +111,7 @@ export class CamRunner {
       project,
       toolpathId: tpId,
       simulated: this.isSimulated(project, tpId),
+      images: this.getImages(),
     });
     if (res.ok && res.kind === 'export') {
       const { ok, issues, fileName } = res.result;

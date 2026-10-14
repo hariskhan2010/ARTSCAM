@@ -208,7 +208,10 @@ export function Btn(props: {
   );
 }
 
-/** A panel section; `collapsible` ones remember nothing and start open unless told. */
+/**
+ * A panel section. Collapsible ones start as `defaultOpen` says (default
+ * open) and then keep whatever the user chose, even if `defaultOpen` changes.
+ */
 export function Section(props: {
   title: string;
   icon?: LucideIcon;
@@ -218,6 +221,7 @@ export function Section(props: {
   defaultOpen?: boolean;
 }) {
   const Icon = props.icon;
+  const [open, setOpen] = useState(props.defaultOpen ?? true);
   const head = (
     <>
       {Icon && <Icon size={15} aria-hidden />}
@@ -229,7 +233,11 @@ export function Section(props: {
   );
   if (props.collapsible) {
     return (
-      <details className="panel" open={props.defaultOpen ?? true}>
+      <details
+        className="panel"
+        open={open}
+        onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
         <summary>
           {head}
           <ChevronDown size={15} className="chevron" aria-hidden />

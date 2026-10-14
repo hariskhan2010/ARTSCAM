@@ -5,7 +5,7 @@ import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
 import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
-import { evaluateRelief, type ReliefImages } from '../relief/relief';
+import { evaluateRelief, gridRange, type ReliefImages } from '../relief/relief';
 import { emitProfile, profileContours } from './profile';
 import { toolLabel, toolProblems } from './tools';
 import type { CamProgram } from './types';
@@ -79,7 +79,7 @@ export function generate(
       const relief = project.reliefs.find((r) => r.id === tp.relief);
       if (!relief) throw new ToolpathError(`Toolpath ${tp.id} uses unknown relief "${tp.relief}"`);
       const pr = placeRelief(evaluateRelief(relief, project, images), topZ, bounds.min[2]);
-      if (pr.maxH - Math.min(...pr.grid.z) > project.stock.thickness + 1e-9) {
+      if (pr.maxH - gridRange(pr.grid.z).min > project.stock.thickness + 1e-9) {
         warnings.push('The relief is deeper than the material; the checker will block export');
       }
       if (tp.type === 'finish3d') {

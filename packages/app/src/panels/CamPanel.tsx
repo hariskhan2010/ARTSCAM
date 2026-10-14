@@ -26,6 +26,8 @@ import {
   SquareDashed,
   Triangle,
   Wrench,
+  Layers3,
+  Waves,
   X,
 } from 'lucide-react';
 import { useEffect } from 'react';
@@ -50,6 +52,8 @@ const TYPE_INFO: Record<Toolpath['type'], { label: string; icon: typeof Route; t
   pocket: { label: 'Pocket', icon: SquareDashed, text: 'Clear the area inside shapes' },
   vcarve: { label: 'V-carve', icon: Triangle, text: 'Carve lettering and art with a V-bit' },
   drill: { label: 'Drill', icon: Drill, text: 'Drill a hole at each shape’s centre' },
+  rough3d: { label: '3D rough', icon: Layers3, text: 'Clear material above a relief in steps' },
+  finish3d: { label: '3D finish', icon: Waves, text: 'Follow the relief surface with a ball nose' },
 };
 
 // --- Tools -------------------------------------------------------------------
@@ -235,7 +239,7 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
       label="Cut depth"
       units={u}
       min={0.001}
-      value={tp.params.depth}
+      value={'depth' in tp.params ? tp.params.depth : 0}
       testId="tp-depth"
       help="How deep the finished cut goes, measured from the top of the material"
       onCommit={(d) => save({ ...tp, params: { ...tp.params, depth: d } } as Toolpath)}
@@ -426,6 +430,52 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
         </>
       );
     }
+    case 'rough3d': {
+      const p = tp.params;
+      return (
+        <>
+          <NumberField
+            label="Leave on relief"
+            units={u}
+            min={0}
+            value={p.allowance ?? 0.5}
+            help="Material left above the relief for the finishing pass"
+            onCommit={(allowance) => save({ ...tp, params: { ...p, allowance } })}
+          />
+          <Hint>
+            Uses the tool's depth per pass for each level.{' '}
+            {tp.vectors.length
+              ? `Limited to ${tp.vectors.length} shape(s).`
+              : 'Covers the whole material.'}
+          </Hint>
+        </>
+      );
+    }
+    case 'finish3d': {
+      const p = tp.params;
+      return (
+        <>
+          <Segmented
+            label="Pattern"
+            value={p.pattern}
+            options={[
+              { value: 'x', label: 'Along X' },
+              { value: 'y', label: 'Along Y' },
+              { value: 'xy', label: 'X then Y', help: 'Smoother, twice the time' },
+            ]}
+            onChange={(pattern) => save({ ...tp, params: { ...p, pattern } })}
+          />
+          <NumberField
+            label="Stepover"
+            units={u}
+            min={0.01}
+            value={p.stepOver ?? store.doc.tools.find((t) => t.id === tp.tool)?.stepOver ?? 0.5}
+            help="Distance between passes; smaller is smoother but slower"
+            onCommit={(stepOver) => save({ ...tp, params: { ...p, stepOver } })}
+          />
+        </>
+      );
+    }
     case 'drill': {
       const p = tp.params;
       const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
@@ -490,15 +540,28 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
     const vectors = store.ui.selection.filter((id) => doc.vectors.some((v) => v.id === id));
     const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
     // V-carving needs a V-bit: use one from the library when the active tool is not.
+    // Each job prefers the tool type it needs when the library has one.
+    const want =
+      type === 'vcarve'
+        ? 'vbit'
+        : type === 'finish3d'
+          ? 'ballnose'
+          : type === 'rough3d'
+            ? 'flat'
+            : undefined;
     const tool =
-      type === 'vcarve' && active?.type !== 'vbit'
-        ? (doc.tools.find((t) => t.type === 'vbit') ?? active)
-        : active;
+      want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active;
+    const relief = doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? doc.reliefs[0];
+    const is3d = type === 'rough3d' || type === 'finish3d';
     if (!tool) {
       store.setUi({ message: 'Add a tool first (Tools section below)' });
       return;
     }
-    if (vectors.length === 0) {
+    if (is3d && !relief) {
+      store.setUi({ message: 'Make a relief first (step 2, Relief)' });
+      return;
+    }
+    if (vectors.length === 0 && !is3d) {
       store.setUi({ message: 'Select the shapes to machine on the canvas first' });
       return;
     }
@@ -510,7 +573,11 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
           ? { depth, strategy: 'offset' as const }
           : type === 'vcarve'
             ? { depth: Math.min(6, doc.stock.thickness) }
-            : { depth };
+            : type === 'rough3d'
+              ? { allowance: 0.5 }
+              : type === 'finish3d'
+                ? { pattern: 'x' as const }
+                : { depth };
     if (type === 'vcarve' && tool.type !== 'vbit') {
       store.setUi({
         message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
@@ -518,9 +585,15 @@ function ToolpathsSection({ store, runner }: { store: EditorStore; runner: CamRu
     }
     const name = `${TYPE_INFO[type].label} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;
     store.execute(
-      addToolpath({ type, tool: tool.id, vectors, name, params } as Parameters<
-        typeof addToolpath
-      >[0]),
+      addToolpath({
+        type,
+        tool: tool.id,
+        // 3D jobs cover the whole relief unless shapes are selected as a boundary (roughing only).
+        vectors: is3d && type === 'finish3d' ? [] : vectors,
+        name,
+        params,
+        ...(is3d && relief ? { relief: relief.id } : {}),
+      } as Parameters<typeof addToolpath>[0]),
     );
     store.setUi({ activeToolpath: store.doc.toolpaths.at(-1)?.id });
   };

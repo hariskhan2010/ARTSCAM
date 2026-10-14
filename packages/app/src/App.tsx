@@ -107,7 +107,14 @@ function exportDxfFile(store: EditorStore) {
 
 export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
-  const runner = useMemo(() => new CamRunner(() => store.touch()), [store]);
+  const runner = useMemo(
+    () =>
+      new CamRunner(
+        () => store.touch(),
+        () => store.images,
+      ),
+    [store],
+  );
   useEffect(() => () => runner.dispose(), [runner]);
 
   // Restore the last session once, then autosave a second after each change.

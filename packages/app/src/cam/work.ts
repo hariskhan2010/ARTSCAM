@@ -15,7 +15,10 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
   try {
     switch (req.kind) {
       case 'preview': {
-        const ex = exportToolpath(req.project, req.toolpathId, { simulated: true });
+        const ex = exportToolpath(req.project, req.toolpathId, {
+          simulated: true,
+          images: req.images,
+        });
         const b = stockBounds(req.project.stock);
         const pts = ex.program.moves.flatMap((m) =>
           m.kind === 'dwell' ? [] : [m.to[0] - b.min[0], m.to[1] - b.min[1], m.to[2], KIND[m.kind]],
@@ -38,7 +41,10 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
         };
       }
       case 'simulate': {
-        const ex = exportToolpath(req.project, req.toolpathId, { simulated: true });
+        const ex = exportToolpath(req.project, req.toolpathId, {
+          simulated: true,
+          images: req.images,
+        });
         const hm = simulate(
           createHeightmap(req.project.stock, { maxCells: SIM_CELLS }),
           ex.check.program,
@@ -55,7 +61,10 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
         };
       }
       case 'export': {
-        const ex = exportToolpath(req.project, req.toolpathId, { simulated: req.simulated });
+        const ex = exportToolpath(req.project, req.toolpathId, {
+          simulated: req.simulated,
+          images: req.images,
+        });
         return {
           response: {
             id: req.id,

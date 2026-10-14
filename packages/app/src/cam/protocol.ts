@@ -3,9 +3,19 @@ import type { Issue, Project } from '@naqsh/core';
 /** Messages between the UI and the CAM worker. */
 
 export type CamRequest =
-  | { id: number; kind: 'preview'; project: Project; toolpathId: string }
-  | { id: number; kind: 'simulate'; project: Project; toolpathId: string }
-  | { id: number; kind: 'export'; project: Project; toolpathId: string; simulated: boolean };
+  | { id: number; kind: 'preview'; project: Project; toolpathId: string; images: Images }
+  | { id: number; kind: 'simulate'; project: Project; toolpathId: string; images: Images }
+  | {
+      id: number;
+      kind: 'export';
+      project: Project;
+      toolpathId: string;
+      simulated: boolean;
+      images: Images;
+    };
+
+/** Grayscale images used by image reliefs (3D toolpaths need them). */
+export type Images = Record<string, Uint8Array>;
 
 export interface PreviewResult {
   /** x, y, z, kind per move, in world coordinates (kind: 0 rapid, 1 plunge, 2 cut). */

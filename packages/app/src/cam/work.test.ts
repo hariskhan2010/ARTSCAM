@@ -28,7 +28,13 @@ function project(depth = 6): Project {
 
 describe('CAM worker jobs', () => {
   it('preview returns world-coordinate moves and a time estimate', () => {
-    const { response } = handle({ id: 1, kind: 'preview', project: project(), toolpathId: 'tp' });
+    const { response } = handle({
+      id: 1,
+      kind: 'preview',
+      project: project(),
+      toolpathId: 'tp',
+      images: {},
+    });
     expect(response.ok).toBe(true);
     if (!response.ok || response.kind !== 'preview') return;
     const { path, seconds, issues } = response.result;
@@ -40,7 +46,13 @@ describe('CAM worker jobs', () => {
   });
 
   it('simulate lowers the stock along the cut', () => {
-    const { response } = handle({ id: 2, kind: 'simulate', project: project(), toolpathId: 'tp' });
+    const { response } = handle({
+      id: 2,
+      kind: 'simulate',
+      project: project(),
+      toolpathId: 'tp',
+      images: {},
+    });
     if (!response.ok || response.kind !== 'simulate') throw new Error('simulate failed');
     expect(response.result.z.reduce((m, z) => Math.min(m, z), Infinity)).toBeCloseTo(-6, 5);
   });
@@ -52,13 +64,21 @@ describe('CAM worker jobs', () => {
       project: project(),
       toolpathId: 'tp',
       simulated: false,
+      images: {},
     });
     if (!blocked.response.ok || blocked.response.kind !== 'export')
       throw new Error('export failed');
     expect(blocked.response.result.ok).toBe(false);
 
     const p = project();
-    const done = handle({ id: 4, kind: 'export', project: p, toolpathId: 'tp', simulated: true });
+    const done = handle({
+      id: 4,
+      kind: 'export',
+      project: p,
+      toolpathId: 'tp',
+      simulated: true,
+      images: {},
+    });
     if (!done.response.ok || done.response.kind !== 'export') throw new Error('export failed');
     expect(done.response.result.ok).toBe(true);
     const check = checkGcode(done.response.result.gcode, {
@@ -71,7 +91,13 @@ describe('CAM worker jobs', () => {
   });
 
   it('reports errors instead of throwing', () => {
-    const { response } = handle({ id: 5, kind: 'preview', project: project(), toolpathId: 'nope' });
+    const { response } = handle({
+      id: 5,
+      kind: 'preview',
+      project: project(),
+      toolpathId: 'nope',
+      images: {},
+    });
     expect(response).toMatchObject({ id: 5, ok: false });
   });
 });

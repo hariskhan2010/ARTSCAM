@@ -38,3 +38,38 @@ test('M4: shape → dome relief, 3D view, STL export, undo', async ({ page }) =>
   await page.keyboard.press('Control+z'); // undo the dome step
   await expect(page.getByTestId('relief-steps')).toHaveCount(0);
 });
+
+test('M5: relief → 3D rough and finish → simulate → export', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('tool-ellipse').click();
+  await drag(page, [380, 300], [480, 380]);
+  await page.getByTestId('tab-relief').click();
+  await page.getByTestId('relief-create').click();
+  await page.getByTestId('relief-height').fill('5');
+  await page.getByTestId('relief-height').press('Enter');
+  await page.getByTestId('relief-add-shapes').click();
+  await expect(page.getByTestId('relief-steps')).toContainText('Dome 5 mm');
+
+  await page.getByTestId('tab-cam').click();
+  await page.getByTestId('add-tool').selectOption({ label: '6 mm flat end mill' });
+  await page.getByTestId('add-tool').selectOption({ label: '6 mm ball nose' });
+
+  await page.getByTestId('new-rough3d').click();
+  await expect(page.getByTestId('tp-estimate')).toContainText('Estimated time', {
+    timeout: 60_000,
+  });
+  await page.getByTestId('simulate').click();
+  await expect(page.getByTestId('sim-state')).toHaveText('Simulated', { timeout: 60_000 });
+
+  await page.getByTestId('new-finish3d').click();
+  await expect(page.getByTestId('tp-estimate')).toContainText('Estimated time', {
+    timeout: 60_000,
+  });
+  await page.getByTestId('simulate').click();
+  await expect(page.getByTestId('sim-state')).toHaveText('Simulated', { timeout: 60_000 });
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-nc').click();
+  const gcode = readFileSync(await (await download).path(), 'utf8');
+  expect(gcode).toContain('ball nose');
+  await expect(page.getByTestId('message')).toContainText('checker passed');
+});
