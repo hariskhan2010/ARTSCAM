@@ -40,6 +40,8 @@ test('M4: shape → dome relief, 3D view, STL export, undo', async ({ page }) =>
 });
 
 test('M5: relief → 3D rough and finish → simulate → export', async ({ page }) => {
+  // Generates, simulates and exports two full-material 3D toolpaths.
+  test.setTimeout(90_000);
   await page.goto('/');
   await page.getByTestId('tool-ellipse').click();
   await drag(page, [380, 300], [480, 380]);

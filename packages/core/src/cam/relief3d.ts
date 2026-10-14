@@ -55,14 +55,32 @@ export function dropCutter(pr: PlacedRelief, tool: ToolShape, inflate = 0) {
   for (let i = 0; i < table.length; i++)
     table[i] = heightAt(tool, Math.max(0, Math.min(R, i * step) - inflate));
   const shift = pr.top - pr.maxH;
+  const rowMax = rowWindowMax(g.z, g.cols, g.rows, k);
   return {
     at(x: number, y: number): number {
       const cx = Math.floor(x / res);
       const cy = Math.floor(y / res);
+      const c0 = Math.max(0, cx - k);
+      const c1 = Math.min(g.cols - 1, cx + k);
+      const r0 = Math.max(0, cy - k);
+      const r1 = Math.min(g.rows - 1, cy + k);
+      const mc = Math.min(g.cols - 1, Math.max(0, cx));
+      const start = Math.min(r1, Math.max(r0, cy));
       let best = -Infinity;
-      for (let r = Math.max(0, cy - k); r <= Math.min(g.rows - 1, cy + k); r++) {
+      // Rows nearest first; skip a row when even its highest cell, at the
+      // row's nearest distance, cannot beat the best so far (the tool height
+      // only grows with distance), so the result is the same as a full scan.
+      for (let i = 0; ; i++) {
+        const r = i % 2 === 0 ? start + i / 2 : start - (i + 1) / 2;
+        if (start + i / 2 > r1 && start - (i + 1) / 2 < r0) break;
+        if (r < r0 || r > r1) continue;
         const dy = (r + 0.5) * res - y;
-        for (let c = Math.max(0, cx - k); c <= Math.min(g.cols - 1, cx + k); c++) {
+        const ady = Math.abs(dy);
+        if (ady > R) continue;
+        const bound =
+          (rowMax[r * g.cols + mc] as number) + shift - (table[Math.floor(ady / step)] as number);
+        if (bound <= best) continue;
+        for (let c = c0; c <= c1; c++) {
           const dx = (c + 0.5) * res - x;
           const d = Math.sqrt(dx * dx + dy * dy);
           if (d > R) continue;
@@ -76,6 +94,32 @@ export function dropCutter(pr: PlacedRelief, tool: ToolShape, inflate = 0) {
       return Math.min(pr.top, Math.max(pr.floor, best));
     },
   };
+}
+
+/**
+ * Per row, the maximum of z over columns c − k … c + k (clamped to the row),
+ * with a monotonic queue: O(cells).
+ */
+function rowWindowMax(z: Float32Array, cols: number, rows: number, k: number): Float32Array {
+  const out = new Float32Array(z.length);
+  const q = new Int32Array(cols);
+  for (let r = 0; r < rows; r++) {
+    const o = r * cols;
+    let head = 0;
+    let tail = 0;
+    let next = 0; // next column to push
+    for (let c = 0; c < cols; c++) {
+      const hi = Math.min(cols - 1, c + k);
+      while (next <= hi) {
+        const v = z[o + next] as number;
+        while (tail > head && (z[o + (q[tail - 1] as number)] as number) <= v) tail--;
+        q[tail++] = next++;
+      }
+      while ((q[head] as number) < c - k) head++;
+      out[o + c] = z[o + (q[head] as number)] as number;
+    }
+  }
+  return out;
 }
 
 /**

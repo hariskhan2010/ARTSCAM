@@ -13,7 +13,7 @@ import { createHeightmap, simulate } from '../sim/heightmap';
 import { ellipse } from '../vector/shapes';
 import { exportToolpath } from './export';
 import { dropCutter, placeRelief } from './relief3d';
-import { TOOL_PRESETS } from './tools';
+import { heightAt, TOOL_PRESETS } from './tools';
 
 const BALL6 = TOOL_PRESETS[5]!; // 6 mm ball nose
 const FLAT6 = TOOL_PRESETS[3]!; // 6 mm flat
@@ -93,6 +93,39 @@ describe('3D CAM (M5)', () => {
     }
     // A flat tool over a flat area sits on the surface.
     expect(dropCutter(pr, FLAT6).at(3, 3)).toBeCloseTo(-15, 5);
+  });
+
+  it('drop-cutter: the row-skipping scan equals a full scan of every cell', () => {
+    // Random bumpy relief, several tools, points inside, on and outside the grid.
+    const cols = 37;
+    const rows = 29;
+    const res = 0.5;
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const z = new Float32Array(cols * rows).map(() => rnd() * 4);
+    const pr = placeRelief({ cols, rows, resolution: res, z }, 0, -20);
+    const V90 = TOOL_PRESETS[7]!;
+    for (const tool of [BALL6, FLAT6, V90]) {
+      const R = tool.diameter / 2;
+      const brute = (x: number, y: number) => {
+        let best = -Infinity;
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++) {
+            const d = Math.hypot((c + 0.5) * res - x, (r + 0.5) * res - y);
+            if (d > R) continue;
+            const step = Math.min(res / 8, R / 256);
+            const h = heightAt(tool, Math.min(R, Math.floor(d / step) * step));
+            best = Math.max(best, z[r * cols + c]! - pr.maxH - h);
+          }
+        return best === -Infinity ? 0 : Math.min(0, Math.max(-20, best));
+      };
+      const drop = dropCutter(pr, tool);
+      for (let i = 0; i < 300; i++) {
+        const x = rnd() * (cols * res + 8) - 4;
+        const y = rnd() * (rows * res + 8) - 4;
+        expect(drop.at(x, y)).toBeCloseTo(brute(x, y), 4);
+      }
+    }
   });
 
   it('finishing: no gouges, and the surface matches the relief within the scallop', () => {
