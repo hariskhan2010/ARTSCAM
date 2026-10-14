@@ -45,7 +45,7 @@ export default tseslint.config(
   },
   {
     // Tests index into known fixtures; a failed `!` shows up as a test failure anyway.
-    files: ['**/*.test.{ts,tsx}'],
+    files: ['**/*.test.{ts,tsx}', '**/e2e/**/*.spec.ts'],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
 );

@@ -91,13 +91,12 @@ export function rectangle(x: number, y: number, w: number, h: number, radius = 0
 
 /** Ellipse (circle when ry is omitted) centred at (cx, cy), rotated by `rotation` radians. */
 export function ellipse(cx: number, cy: number, rx: number, ry = rx, rotation = 0): Segment[] {
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  return [
-    { type: 'move', p: [cx + rx * cos, cy + rx * sin] },
-    ...arcToCubics(cx, cy, rx, ry, rotation, 0, 2 * Math.PI),
-    { type: 'close' },
-  ];
+  const start: [number, number] = [cx + rx * Math.cos(rotation), cy + rx * Math.sin(rotation)];
+  const arcs = arcToCubics(cx, cy, rx, ry, rotation, 0, 2 * Math.PI);
+  // End exactly on the start point (cos 2π is not exactly 1 in floating point).
+  const last = arcs.at(-1);
+  if (last?.type === 'cubic') last.p = [start[0], start[1]];
+  return [{ type: 'move', p: start }, ...arcs, { type: 'close' }];
 }
 
 function closedPolyline(points: Vec2[]): Segment[] {

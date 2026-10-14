@@ -27,4 +27,5 @@ Licences were read from each package's `package.json` after install.
 | eslint-plugin-react-hooks | MIT | React hooks lint rules | T0.1 |
 | globals | MIT | ESLint global definitions | T0.1 |
 | prettier | MIT | Formatting | T0.1 |
+| @playwright/test | Apache-2.0 | UI smoke tests (uses installed Chrome) | T1.4 |
 | @types/node, @types/react, @types/react-dom | MIT | Type definitions | T0.1 |

@@ -1,0 +1,299 @@
+import { transformSegments, type Matrix } from '../vector/path';
+import type { Command } from './history';
+import {
+  PROJECT_FORMAT,
+  PROJECT_VERSION,
+  type Layer,
+  type Machine,
+  type Project,
+  type Segment,
+  type Stock,
+  type Tool,
+  type Toolpath,
+  type Units,
+  type Vector,
+} from './schema';
+
+/**
+ * Document commands (CLAUDE.md: all mutations go through commands). Each one
+ * returns a new project and leaves its input untouched; a command that would
+ * change nothing returns the same object so History records no step.
+ */
+
+export type ProjectCommand = Command<Project>;
+
+/** A blank project: 300 × 200 × 18 mm stock, one layer, GRBL machine. */
+export function newProject(overrides: Partial<Pick<Project, 'units' | 'stock'>> = {}): Project {
+  return {
+    format: PROJECT_FORMAT,
+    version: PROJECT_VERSION,
+    units: overrides.units ?? 'mm',
+    stock: overrides.stock ?? {
+      width: 300,
+      height: 200,
+      thickness: 18,
+      origin: 'bottom-left',
+      zZero: 'top',
+    },
+    layers: [{ id: 'L1', name: 'Design', visible: true, locked: false }],
+    vectors: [],
+    reliefs: [],
+    tools: [],
+    toolpaths: [],
+    machine: { post: 'grbl', travel: [800, 800, 100], maxFeed: 5000, safeZ: 5 },
+  };
+}
+
+/** Smallest unused id of the form `${prefix}${n}`. */
+export function nextId(prefix: string, taken: Iterable<{ id: string }>): string {
+  const used = new Set<string>();
+  for (const t of taken) used.add(t.id);
+  let n = 1;
+  while (used.has(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
+}
+
+/** Ids for `count` new items, all unused and distinct. */
+export function nextIds(prefix: string, taken: Iterable<{ id: string }>, count: number): string[] {
+  const pool = [...taken];
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = nextId(prefix, pool);
+    ids.push(id);
+    pool.push({ id });
+  }
+  return ids;
+}
+
+export type NewVector = Omit<Vector, 'id'> & { id?: string };
+
+export function addVectors(vectors: readonly NewVector[], label = 'Add vector'): ProjectCommand {
+  return {
+    label,
+    apply: (p) => {
+      if (vectors.length === 0) return p;
+      const ids = nextIds('v', p.vectors, vectors.length);
+      return {
+        ...p,
+        vectors: [
+          ...p.vectors,
+          ...vectors.map((v, i) => ({ ...v, id: v.id ?? (ids[i] as string) })),
+        ],
+      };
+    },
+  };
+}
+
+export function deleteVectors(ids: readonly string[]): ProjectCommand {
+  return {
+    label: ids.length === 1 ? 'Delete vector' : 'Delete vectors',
+    apply: (p) => {
+      const drop = new Set(ids);
+      if (!p.vectors.some((v) => drop.has(v.id))) return p;
+      // Toolpaths and relief ops must not point at deleted vectors.
+      const toolpaths = p.toolpaths
+        .map((tp) => ({ ...tp, vectors: tp.vectors.filter((v) => !drop.has(v)) }))
+        .filter((tp) => tp.vectors.length > 0) as Toolpath[];
+      const reliefs = p.reliefs.map((r) => ({
+        ...r,
+        ops: r.ops.filter((op) => !drop.has(op.vector)),
+      }));
+      return { ...p, vectors: p.vectors.filter((v) => !drop.has(v.id)), toolpaths, reliefs };
+    },
+  };
+}
+
+/** Applies an affine transform (move, scale, rotate, mirror) to vectors. */
+export function transformVectors(
+  ids: readonly string[],
+  m: Matrix,
+  label = 'Transform',
+): ProjectCommand {
+  return {
+    label,
+    apply: (p) => {
+      const set = new Set(ids);
+      if (!p.vectors.some((v) => set.has(v.id))) return p;
+      if (m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1 && m[4] === 0 && m[5] === 0)
+        return p;
+      return {
+        ...p,
+        vectors: p.vectors.map((v) =>
+          set.has(v.id) ? { ...v, segments: transformSegments(v.segments, m) } : v,
+        ),
+      };
+    },
+  };
+}
+
+/** Replaces one vector's segments (node edits). */
+export function setVectorSegments(
+  id: string,
+  segments: readonly Segment[],
+  closed?: boolean,
+  label = 'Edit nodes',
+): ProjectCommand {
+  return {
+    label,
+    apply: (p) => {
+      const v = p.vectors.find((x) => x.id === id);
+      if (!v) return p;
+      return {
+        ...p,
+        vectors: p.vectors.map((x) =>
+          x.id === id ? { ...x, segments: [...segments], closed: closed ?? x.closed } : x,
+        ),
+      };
+    },
+  };
+}
+
+/** Copies vectors with new ids (optionally transformed). */
+export function duplicateVectors(ids: readonly string[], m?: Matrix): ProjectCommand {
+  return {
+    label: 'Duplicate',
+    apply: (p) => {
+      const src = p.vectors.filter((v) => ids.includes(v.id));
+      if (src.length === 0) return p;
+      return addVectors(
+        src.map((v) => ({
+          layer: v.layer,
+          closed: v.closed,
+          segments: m ? transformSegments(v.segments, m) : v.segments,
+        })),
+        'Duplicate',
+      ).apply(p);
+    },
+  };
+}
+
+export function moveVectorsToLayer(ids: readonly string[], layer: string): ProjectCommand {
+  return {
+    label: 'Move to layer',
+    apply: (p) => {
+      if (!p.layers.some((l) => l.id === layer)) return p;
+      const set = new Set(ids);
+      if (!p.vectors.some((v) => set.has(v.id) && v.layer !== layer)) return p;
+      return { ...p, vectors: p.vectors.map((v) => (set.has(v.id) ? { ...v, layer } : v)) };
+    },
+  };
+}
+
+export function addLayer(name: string): ProjectCommand {
+  return {
+    label: 'Add layer',
+    apply: (p) => ({
+      ...p,
+      layers: [...p.layers, { id: nextId('L', p.layers), name, visible: true, locked: false }],
+    }),
+  };
+}
+
+export function updateLayer(id: string, patch: Partial<Omit<Layer, 'id'>>): ProjectCommand {
+  return {
+    label: 'Edit layer',
+    apply: (p) => {
+      const l = p.layers.find((x) => x.id === id);
+      if (!l || Object.entries(patch).every(([k, v]) => l[k as keyof Layer] === v)) return p;
+      return { ...p, layers: p.layers.map((x) => (x.id === id ? { ...x, ...patch } : x)) };
+    },
+  };
+}
+
+/** Deletes a layer and its vectors. The last layer cannot be deleted. */
+export function deleteLayer(id: string): ProjectCommand {
+  return {
+    label: 'Delete layer',
+    apply: (p) => {
+      if (p.layers.length <= 1 || !p.layers.some((l) => l.id === id)) return p;
+      const doomed = p.vectors.filter((v) => v.layer === id).map((v) => v.id);
+      const q = deleteVectors(doomed).apply(p);
+      return { ...q, layers: q.layers.filter((l) => l.id !== id) };
+    },
+  };
+}
+
+export function setStock(stock: Stock): ProjectCommand {
+  return { label: 'Stock setup', apply: (p) => ({ ...p, stock }) };
+}
+
+export function setUnits(units: Units): ProjectCommand {
+  return { label: 'Units', apply: (p) => (p.units === units ? p : { ...p, units }) };
+}
+
+export function setMachine(machine: Machine): ProjectCommand {
+  return { label: 'Machine setup', apply: (p) => ({ ...p, machine }) };
+}
+
+// --- Tools (T2.1) -------------------------------------------------------------
+
+export type NewTool = Omit<Tool, 'id'> & { id?: string };
+
+export function addTool(tool: NewTool): ProjectCommand {
+  return {
+    label: 'Add tool',
+    apply: (p) => ({ ...p, tools: [...p.tools, { ...tool, id: tool.id ?? nextId('t', p.tools) }] }),
+  };
+}
+
+export function updateTool(id: string, tool: Omit<Tool, 'id'>): ProjectCommand {
+  return {
+    label: 'Edit tool',
+    apply: (p) =>
+      p.tools.some((t) => t.id === id)
+        ? { ...p, tools: p.tools.map((t) => (t.id === id ? { ...tool, id } : t)) }
+        : p,
+  };
+}
+
+/** Deletes a tool. Refuses (no change) while a toolpath uses it. */
+export function deleteTool(id: string): ProjectCommand {
+  return {
+    label: 'Delete tool',
+    apply: (p) =>
+      !p.tools.some((t) => t.id === id) || p.toolpaths.some((tp) => tp.tool === id)
+        ? p
+        : { ...p, tools: p.tools.filter((t) => t.id !== id) },
+  };
+}
+
+// --- Toolpaths (M2) ---------------------------------------------------------
+
+export type NewToolpath = Toolpath extends infer T
+  ? T extends Toolpath
+    ? Omit<T, 'id'> & { id?: string }
+    : never
+  : never;
+
+export function addToolpath(toolpath: NewToolpath): ProjectCommand {
+  return {
+    label: 'Add toolpath',
+    apply: (p) => ({
+      ...p,
+      toolpaths: [
+        ...p.toolpaths,
+        { ...toolpath, id: toolpath.id ?? nextId('tp', p.toolpaths) } as Toolpath,
+      ],
+    }),
+  };
+}
+
+export function updateToolpath(toolpath: Toolpath): ProjectCommand {
+  return {
+    label: 'Edit toolpath',
+    apply: (p) =>
+      p.toolpaths.some((t) => t.id === toolpath.id)
+        ? { ...p, toolpaths: p.toolpaths.map((t) => (t.id === toolpath.id ? toolpath : t)) }
+        : p,
+  };
+}
+
+export function deleteToolpath(id: string): ProjectCommand {
+  return {
+    label: 'Delete toolpath',
+    apply: (p) =>
+      p.toolpaths.some((t) => t.id === id)
+        ? { ...p, toolpaths: p.toolpaths.filter((t) => t.id !== id) }
+        : p,
+  };
+}

@@ -14,3 +14,4 @@ export * from './vector/shapes';
 export * from './vector/svg';
 export * from './vector/dxf';
 export { parseXml, XmlError, type XmlElement } from './vector/xml';
+export * from './model/commands';
