@@ -23,6 +23,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
+import { loadAutosave, saveAutosave } from './autosave';
 import { CamRunner } from './cam/runner';
 import { Canvas } from './editor/Canvas';
 import { TOOL_INFO } from './editor/CanvasOverlay';
@@ -105,6 +106,30 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
   const runner = useMemo(() => new CamRunner(() => store.touch()), [store]);
   useEffect(() => () => runner.dispose(), [runner]);
+
+  // Restore the last session once, then autosave a second after each change.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let active = true;
+    void loadAutosave().then((saved) => {
+      if (!active || !saved || store.history.canUndo || store.doc.vectors.length) return;
+      if (saved.project.vectors.length === 0 && saved.project.toolpaths.length === 0) return;
+      store.load(saved.project, saved.reliefData);
+      store.setUi({ message: 'Restored your last session (autosaved in this browser)' });
+    });
+    const unsubscribe = store.history.subscribe(() => {
+      clearTimeout(timer);
+      timer = setTimeout(
+        () => void saveAutosave({ project: store.doc, reliefData: store.reliefData }),
+        1000,
+      );
+    });
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [store]);
   useStore(store);
   const { ui, doc, history } = store;
   const fmt = (mm: number) => formatFixed(fromMm(mm, doc.units), PRECISION[doc.units].display);

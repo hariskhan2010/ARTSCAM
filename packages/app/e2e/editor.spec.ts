@@ -154,3 +154,13 @@ test('DXF import', async ({ page }) => {
   await (await chooser).setFiles(fixture('sign.dxf'));
   await expect(count(page)).toHaveText('5 vectors');
 });
+
+test('autosave restores the drawing after a reload', async ({ page }) => {
+  await page.getByTestId('tool-rect').click();
+  await drag(page, [300, 300], [420, 380]);
+  await expect(count(page)).toHaveText('1 vectors');
+  await page.waitForTimeout(1500); // autosave fires a second after the change
+  await page.reload();
+  await expect(count(page)).toHaveText('1 vectors');
+  await expect(page.getByTestId('message')).toContainText('Restored your last session');
+});

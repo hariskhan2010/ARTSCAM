@@ -9,7 +9,9 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **M2** 2D CAM: tool library, profile (tabs, ramps), pocket (offset/raster, islands), drill/peck, GRBL post, stock simulation, time estimate, export blocked until simulated and checked.
 - **M3** Text (Urdu/Arabic/Latin via HarfBuzz; Naskh and Nastaliq bundled; own fonts) and V-carve.
 - UI redesign: icons, tool hints, clearer panels.
-- Checks: `pnpm run ci` (lint, typecheck, 320 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (12 browser tests each).
+- Mach3, LinuxCNC and generic G-code output (same safe subset as GRBL, plus a G40 G49 G80 safety line; LinuxCNC files wrapped in %).
+- DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
+- Checks: `pnpm run ci` (lint, typecheck, 320 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (13 browser tests each).
 
 ## Blocked: needs you
 
@@ -18,14 +20,14 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 3. **Real calligraphy carve (M3 acceptance).** V-carve Nastaliq text in wood with a 60° or 90° V-bit.
 4. **Time estimate check (T2.6).** Compare the app's estimate with a GRBL simulator or a real run (target ±15%). Not yet verified.
 5. **G-code sender check (T2.5).** Load an exported `.nc` file into a sender's simulator (e.g. UGS, CNCjs).
-6. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh"), licence (GPL vs MIT), and which controllers come after GRBL.
+6. **Try Mach3/LinuxCNC output on a real controller.** It passes the checker, but hasn't run on real hardware.
+7. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh"), licence (GPL vs MIT), and which controllers come after GRBL.
 
 ## Known gaps in finished milestones
 
 - **Text** becomes a shape when added, so it can't be edited afterwards (delete and retype). Bidi is simplified (fine for signs). WOFF2 fonts aren't supported. There is no text on a curve (P2).
 - **V-carve:** flat bottoms are cut with the V-bit itself; there is no separate flat clearing tool. A 70 mm word takes about 18 min. It could be faster with a true medial-axis path or fewer depth passes.
-- **Posts:** only GRBL. Mach3, LinuxCNC and generic are greyed out (P2).
-- **Not started from plan §4 P1:** PWA offline mode, IndexedDB autosave, DXF export.
+- **Not started from plan §4 P1:** PWA offline mode (installable app that works without internet).
 - **Other §4 gaps:** trace bitmap, mirror/array/nesting (P2).
 - The dev server is started by hand with `pnpm dev`.
 
@@ -45,7 +47,7 @@ Suggested M4 breakdown before starting: relief grid model and its storage (`reli
 
 ## How to resume
 
-- Rules: `CLAUDE (1).md`. Rename it to `CLAUDE.md` so Claude Code loads it automatically.
+- Rules: `CLAUDE.md` (loaded automatically by Claude Code).
 - One task at a time, and keep `pnpm run ci` plus both e2e suites green.
 - Golden files: `UPDATE_GOLDEN=1 pnpm --filter @naqsh/core test`, then review the diff.
 - Safety rules (plan.md §7) are never weakened. Export stays blocked on any checker error.
