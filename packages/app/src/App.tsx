@@ -10,10 +10,12 @@ import {
   saveProject,
   PRECISION,
 } from '@naqsh/core';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { CamRunner } from './cam/runner';
 import { Canvas } from './editor/Canvas';
 import { useStore, EditorStore, type ToolName } from './editor/store';
 import { download, pickFile } from './files';
+import { CamPanel } from './panels/CamPanel';
 import { DesignPanel } from './panels/DesignPanel';
 import { appTitle } from './title';
 
@@ -100,6 +102,8 @@ function Button(props: {
 
 export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
+  const runner = useMemo(() => new CamRunner(() => store.touch()), [store]);
+  useEffect(() => () => runner.dispose(), [runner]);
   useStore(store);
   const { ui, doc, history } = store;
   const fmt = (mm: number) => formatFixed(fromMm(mm, doc.units), PRECISION[doc.units].display);
@@ -208,11 +212,35 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
       </aside>
 
       <main className="stage">
-        <Canvas store={store} />
+        <Canvas store={store} runner={runner} />
       </main>
 
       <aside className="sidebar">
-        <DesignPanel store={store} />
+        <div className="tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={ui.sidebarTab === 'design'}
+            className={ui.sidebarTab === 'design' ? 'active' : ''}
+            onClick={() => store.setUi({ sidebarTab: 'design' })}
+            data-testid="tab-design"
+          >
+            Design
+          </button>
+          <button
+            role="tab"
+            aria-selected={ui.sidebarTab === 'cam'}
+            className={ui.sidebarTab === 'cam' ? 'active' : ''}
+            onClick={() => store.setUi({ sidebarTab: 'cam' })}
+            data-testid="tab-cam"
+          >
+            Toolpaths
+          </button>
+        </div>
+        {ui.sidebarTab === 'design' ? (
+          <DesignPanel store={store} />
+        ) : (
+          <CamPanel store={store} runner={runner} />
+        )}
       </aside>
 
       <footer className="status">

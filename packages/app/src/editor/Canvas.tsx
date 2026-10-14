@@ -47,6 +47,8 @@ import {
   type NodeRef,
   type PenNode,
 } from './nodes';
+import type { CamRunner } from '../cam/runner';
+import type { SimResult } from '../cam/protocol';
 import { useStore, type EditorStore } from './store';
 
 /** Hit radius in screen pixels. */
@@ -175,7 +177,41 @@ function nearestSegment(
   return best && { seg: best.seg, t: best.t };
 }
 
-export function Canvas({ store }: { store: EditorStore }) {
+/** Shaded image of a simulated stock heightmap, cached per result. */
+const simImages = new WeakMap<SimResult, HTMLCanvasElement>();
+function simImage(sim: SimResult): HTMLCanvasElement {
+  const cached = simImages.get(sim);
+  if (cached) return cached;
+  const c = document.createElement('canvas');
+  c.width = sim.cols;
+  c.height = sim.rows;
+  const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+  const img = ctx.createImageData(sim.cols, sim.rows);
+  // Shade relative to the deepest cut so shallow pockets still read clearly.
+  let deepest = sim.top;
+  for (let i = 0; i < sim.z.length; i++) deepest = Math.min(deepest, sim.z[i] as number);
+  const range = Math.max(1e-6, sim.top - deepest);
+  for (let r = 0; r < sim.rows; r++) {
+    for (let col = 0; col < sim.cols; col++) {
+      const i = r * sim.cols + col;
+      const z = sim.z[i] as number;
+      // Light from the top-left: compare with the neighbour up-left.
+      const zn = sim.z[Math.max(0, r - 1) * sim.cols + Math.max(0, col - 1)] as number;
+      const shade = Math.max(-50, Math.min(50, (zn - z) * -80));
+      const depth = (sim.top - z) / range; // 0 top … 1 bottom
+      const o = ((sim.rows - 1 - r) * sim.cols + col) * 4; // flip: row 0 is the bottom
+      img.data[o] = 222 - depth * 120 + shade;
+      img.data[o + 1] = 184 - depth * 105 + shade;
+      img.data[o + 2] = 135 - depth * 80 + shade;
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  simImages.set(sim, c);
+  return c;
+}
+
+export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunner }) {
   useStore(store);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<Drag | undefined>(undefined);
@@ -229,6 +265,9 @@ export function Canvas({ store }: { store: EditorStore }) {
     ctx.fillStyle = color('--stock', '#ffffff');
     ctx.fillRect(sx0, sy0, stock.width * v.scale, stock.height * v.scale);
 
+    const camTp = store.ui.sidebarTab === 'cam' ? store.ui.activeToolpath : undefined;
+    const camState = camTp ? runner?.state.get(camTp) : undefined;
+
     // Grid
     const step = gridStep(v.scale);
     const [wx0, wy1] = screenToWorld(v, [0, 0]);
@@ -250,6 +289,18 @@ export function Canvas({ store }: { store: EditorStore }) {
       }
       ctx.stroke();
     }
+    // Simulated stock covers the grid inside the stock.
+    if (camState?.sim) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        simImage(camState.sim),
+        sx0,
+        sy0,
+        stock.width * v.scale,
+        stock.height * v.scale,
+      );
+    }
+
     ctx.strokeStyle = color('--stock-edge', '#7a8696');
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, stock.width * v.scale, stock.height * v.scale);
     // Origin marker
@@ -286,6 +337,25 @@ export function Canvas({ store }: { store: EditorStore }) {
       ctx.stroke();
     }
     ctx.setLineDash([]);
+
+    // Toolpath preview: rapids dashed red, cuts blue, darker when deeper.
+    const path = camState?.preview?.path;
+    if (path) {
+      ctx.lineWidth = 1;
+      for (const rapid of [true, false]) {
+        ctx.beginPath();
+        ctx.strokeStyle = rapid ? 'rgba(201,42,42,0.7)' : color('--toolpath', '#1c7ed6');
+        ctx.setLineDash(rapid ? [4, 4] : []);
+        for (let i = 4; i < path.length; i += 4) {
+          const isRapid = path[i + 3] === 0;
+          if (isRapid !== rapid) continue;
+          ctx.moveTo(...worldToScreen(v, [path[i - 4] as number, path[i - 3] as number]));
+          ctx.lineTo(...worldToScreen(v, [path[i] as number, path[i + 1] as number]));
+        }
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
 
     // Draft shape / pen preview
     if (preview?.kind === 'draft') {

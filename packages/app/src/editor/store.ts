@@ -25,6 +25,11 @@ export interface UiState {
   cursor: [number, number] | undefined;
   /** Short message (import warnings, errors). */
   message: string | undefined;
+  sidebarTab: 'design' | 'cam';
+  /** Toolpath shown in the CAM panel and previewed on the canvas. */
+  activeToolpath: string | undefined;
+  /** Tool being edited in the tool library. */
+  activeTool: string | undefined;
 }
 
 export class EditorStore {
@@ -47,6 +52,9 @@ export class EditorStore {
       sides: 6,
       cursor: undefined,
       message: undefined,
+      sidebarTab: 'design',
+      activeToolpath: undefined,
+      activeTool: undefined,
     };
     this.history.subscribe(() => {
       this.#pruneSelection();
@@ -116,6 +124,11 @@ export class EditorStore {
         activeLayer: layerOk ? this.#ui.activeLayer : (this.doc.layers[0]?.id ?? 'L1'),
       };
     }
+  }
+
+  /** Notifies listeners without changing anything (derived data arrived). */
+  touch(): void {
+    this.#emit();
   }
 
   #emit(): void {

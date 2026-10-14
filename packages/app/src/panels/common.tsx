@@ -13,6 +13,8 @@ export function NumberField(props: {
   decimals?: number;
   testId?: string;
   disabled?: boolean;
+  /** Overrides the unit label, e.g. "/min" is appended for feeds. */
+  suffix?: string;
 }) {
   const { units } = props;
   const shown = units ? fromMm(props.value, units) : props.value;
@@ -47,7 +49,12 @@ export function NumberField(props: {
           if (e.key === 'Escape') setDraft(undefined);
         }}
       />
-      {units && <em>{units === 'mm' ? 'mm' : 'in'}</em>}
+      {(units || props.suffix) && (
+        <em>
+          {units ? (units === 'mm' ? 'mm' : 'in') : ''}
+          {props.suffix ?? ''}
+        </em>
+      )}
     </label>
   );
 }
