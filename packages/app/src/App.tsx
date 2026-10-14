@@ -1,5 +1,6 @@
 import {
   addVectors,
+  exportDxf,
   exportSvg,
   formatFixed,
   fromMm,
@@ -89,6 +90,17 @@ function exportSvgFile(store: EditorStore) {
   download('design.svg', text, 'image/svg+xml');
 }
 
+function exportDxfFile(store: EditorStore) {
+  const { doc } = store;
+  const layers = new Map(doc.layers.filter((l) => l.visible).map((l) => [l.id, l.name]));
+  const text = exportDxf(
+    doc.vectors
+      .filter((v) => layers.has(v.layer))
+      .map((v) => ({ segments: v.segments, closed: v.closed, layer: layers.get(v.layer) ?? '0' })),
+  );
+  download('design.dxf', text, 'application/dxf');
+}
+
 export function App({ initial }: { initial?: EditorStore } = {}) {
   const store = useMemo(() => initial ?? new EditorStore(newProject()), [initial]);
   const runner = useMemo(() => new CamRunner(() => store.touch()), [store]);
@@ -145,6 +157,14 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
           onClick={() => exportSvgFile(store)}
           title="Export the visible shapes as SVG"
           testId="export-svg"
+        />
+        <Btn
+          icon={FileDown}
+          label="Export DXF"
+          variant="ghost"
+          onClick={() => exportDxfFile(store)}
+          title="Export the visible shapes as DXF (mm)"
+          testId="export-dxf"
         />
         <span className="divider" />
         <Btn
