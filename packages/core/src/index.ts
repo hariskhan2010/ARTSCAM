@@ -32,3 +32,4 @@ export * from './cam/vcarve';
 export * from './vector/dxfExport';
 export * from './relief/relief';
 export * from './relief/stl';
+export * from './cam/relief3d';

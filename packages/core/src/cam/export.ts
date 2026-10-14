@@ -3,6 +3,7 @@ import type { Project } from '../model/schema';
 import { postGrbl } from '../post/grbl';
 import { estimateTime, type TimeEstimate } from '../sim/time';
 import { generateToolpath } from './generate';
+import type { ReliefImages } from '../relief/relief';
 import type { CamProgram } from './types';
 
 /**
@@ -25,6 +26,8 @@ export interface ExportResult {
 export interface ExportOptions {
   /** Has this exact toolpath (current parameters) been simulated? */
   simulated: boolean;
+  /** Images used by image reliefs (3D toolpaths). */
+  images?: ReliefImages;
 }
 
 /** Posts that exist; others are planned for later milestones (plan.md §4). */
@@ -40,7 +43,7 @@ export function exportToolpath(
   toolpathId: string,
   options: ExportOptions,
 ): ExportResult {
-  const program = generateToolpath(project, toolpathId);
+  const program = generateToolpath(project, toolpathId, undefined, options.images ?? {});
   if (!AVAILABLE_POSTS.includes(project.machine.post)) {
     throw new Error(`The ${project.machine.post} post-processor is not available yet; choose GRBL`);
   }
@@ -78,6 +81,15 @@ export function toolpathKey(project: Project, toolpathId: string): string {
     tp,
     tool: project.tools.find((t) => t.id === tp.tool),
     vectors: tp.vectors.map((id) => project.vectors.find((v) => v.id === id)),
+    relief: 'relief' in tp ? project.reliefs.find((r) => r.id === tp.relief) : undefined,
+    reliefVectors:
+      'relief' in tp
+        ? project.vectors.filter((v) =>
+            project.reliefs
+              .find((r) => r.id === tp.relief)
+              ?.ops.some((o) => o.op === 'fromVector' && o.vector === v.id),
+          )
+        : undefined,
     stock: project.stock,
     machine: project.machine,
     units: project.units,

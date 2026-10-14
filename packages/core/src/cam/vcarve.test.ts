@@ -47,7 +47,7 @@ function compareWithIdeal(p: Project, cell = 0.1): Compare & { warnings: string[
   const tool = ex.program.tool;
   const tanHalf = Math.tan((((tool.angle ?? 90) / 2) * Math.PI) / 180);
   const tp = p.toolpaths[0]!;
-  const maxDepth = Math.min(tp.params.depth, tool.diameter / 2 / tanHalf);
+  const maxDepth = Math.min((tp.params as { depth: number }).depth, tool.diameter / 2 / tanHalf);
   const rings = flatten(p.vectors[0]!.segments, 0.005, true).map((x) => x.points);
   const hm = simulate(createHeightmap(p.stock, { cell }), ex.check.program, tool);
 

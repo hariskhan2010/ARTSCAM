@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { checkGcode } from '../gcode/checker';
 import { parseGcode } from '../gcode/parser';
 import {
+  addRelief,
   addTool,
   addToolpath,
   addVectors,
   newProject,
+  setReliefOp,
   transformVectors,
   type NewToolpath,
 } from '../model/commands';
@@ -394,7 +396,46 @@ describe('drill', () => {
 // --- Post (T2.5) + golden G-code ---------------------------------------------------
 
 const goldenDir = fileURLToPath(new URL('../../../../fixtures/gcode/golden/', import.meta.url));
+/** Small relief job for the 3D golden files (kept small on purpose). */
+function reliefProject(): Project {
+  let p = newProject({
+    stock: { width: 30, height: 20, thickness: 10, origin: 'bottom-left', zZero: 'top' },
+  });
+  p = addVectors([{ id: 'c', layer: 'L1', closed: true, segments: ellipse(15, 10, 7) }]).apply(p);
+  p = addRelief(0.5, 'r1').apply(p);
+  p = setReliefOp('r1', {
+    op: 'fromVector',
+    vector: 'c',
+    profile: 'dome',
+    height: 3,
+    mode: 'add',
+  }).apply(p);
+  p = addTool({ id: 'ball', ...TOOL_PRESETS[5]!, stepOver: 2 }).apply(p);
+  p = addTool({ id: 'flat', ...TOOL_PRESETS[3]! }).apply(p);
+  p = addToolpath({
+    id: 'finish3d',
+    name: 'Relief finish',
+    type: 'finish3d',
+    tool: 'ball',
+    relief: 'r1',
+    vectors: [],
+    params: { pattern: 'x' },
+  }).apply(p);
+  p = addToolpath({
+    id: 'rough3d',
+    name: 'Relief rough',
+    type: 'rough3d',
+    tool: 'flat',
+    relief: 'r1',
+    vectors: [],
+    params: { allowance: 0.5 },
+  }).apply(p);
+  return projectSchema.parse(p);
+}
+
 const goldenCases: { file: string; project: Project; id: string }[] = [
+  { file: 'finish3d.nc', project: reliefProject(), id: 'finish3d' },
+  { file: 'rough3d.nc', project: reliefProject(), id: 'rough3d' },
   ...project.toolpaths.map((t) => ({ file: `${t.id}.nc`, project, id: t.id })),
   { file: 'cutout-inch.nc', project: camProject('inch'), id: 'cutout' },
 ];
@@ -528,7 +569,7 @@ describe('export flow', () => {
   it('is blocked by any checker error, e.g. cutting deeper than the stock', () => {
     const p = structuredClone(project);
     const tp = p.toolpaths.find((t) => t.id === 'holecut')!;
-    tp.params.depth = 20;
+    if ('depth' in tp.params) tp.params.depth = 20;
     const ex = exportToolpath(p, 'holecut', { simulated: true });
     expect(ex.ok).toBe(false);
     expect(ex.check.issues.some((i) => i.rule === 'depth')).toBe(true);

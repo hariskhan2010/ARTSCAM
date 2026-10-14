@@ -92,9 +92,10 @@ export function deleteVectors(ids: readonly string[]): ProjectCommand {
       const drop = new Set(ids);
       if (!p.vectors.some((v) => drop.has(v.id))) return p;
       // Toolpaths and relief ops must not point at deleted vectors.
+      // Drop toolpaths that lost all their shapes; 3D toolpaths with no boundary stay.
       const toolpaths = p.toolpaths
-        .map((tp) => ({ ...tp, vectors: tp.vectors.filter((v) => !drop.has(v)) }))
-        .filter((tp) => tp.vectors.length > 0) as Toolpath[];
+        .filter((tp) => tp.vectors.length === 0 || tp.vectors.some((v) => !drop.has(v)))
+        .map((tp) => ({ ...tp, vectors: tp.vectors.filter((v) => !drop.has(v)) })) as Toolpath[];
       const reliefs = p.reliefs.map((r) => ({
         ...r,
         ops: r.ops.filter((op) => op.op !== 'fromVector' || !drop.has(op.vector)),

@@ -155,9 +155,23 @@ export function emitPocket(
     if (region.length) warnings.push('The tool is too large to fit inside the pocket; nothing cut');
     return;
   }
+  emitPocketCentres(b, centres, tool, params, passDepths(b.topZ, params.depth, tool.stepDown));
+}
+
+/**
+ * Clears a tool-centre region at each of the given depths (absolute Z),
+ * staying down for short links through already-cleared material.
+ */
+export function emitPocketCentres(
+  b: PathBuilder,
+  centres: Region,
+  tool: Pick<Tool, 'diameter' | 'stepOver'>,
+  params: PocketParams,
+  depths: readonly number[],
+): void {
   const template = pocketPieces(centres, tool, params);
   const maxLink = 2 * tool.diameter;
-  for (const z of passDepths(b.topZ, params.depth, tool.stepDown)) {
+  for (const z of depths) {
     for (const piece of template) {
       const pts = piece.closed ? startNearest(piece.points, b.xy) : piece.points;
       const start = pts[0] as Vec2;

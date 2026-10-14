@@ -53,6 +53,14 @@ export function createHeightmap(
   };
 }
 
+/** Tool height from the profile table at fractional index t (linear interpolation). */
+function lookup(profile: Float32Array, t: number): number {
+  const i = Math.floor(t);
+  if (i >= profile.length - 1) return profile[profile.length - 1] as number;
+  const f = t - i;
+  return (profile[i] as number) * (1 - f) + (profile[i + 1] as number) * f;
+}
+
 /**
  * Lowers cells under the tool tip at (x, y, z). Only the part of the tool
  * below the stock top can cut, so the footprint is the tool radius at that
@@ -78,7 +86,7 @@ function stamp(
       const cx = hm.x0 + c * hm.cell - x;
       const d = Math.hypot(cx, cy);
       if (d > R) continue;
-      const h = profile[Math.min(profile.length - 1, Math.round(d / step))] as number;
+      const h = lookup(profile, d / step);
       const zz = z + h;
       const i = r * hm.cols + c;
       if (zz < (hm.z[i] as number)) hm.z[i] = zz;
@@ -116,7 +124,7 @@ function sweepLevel(
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
       if (d > R) continue;
-      const zz = z + (profile[Math.min(profile.length - 1, Math.round(d / step))] as number);
+      const zz = z + lookup(profile, d / step);
       const i = r * hm.cols + c;
       if (zz < (hm.z[i] as number)) hm.z[i] = zz;
     }

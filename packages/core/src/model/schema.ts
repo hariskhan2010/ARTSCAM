@@ -195,6 +195,33 @@ export const toolpathSchema = z.discriminatedUnion('type', [
   z.strictObject({
     id,
     name: z.string().optional(),
+    type: z.literal('rough3d'),
+    tool: id,
+    relief: id,
+    /** Optional boundary shapes; empty = the whole material. */
+    vectors: z.array(id),
+    params: z.strictObject({
+      /** Material left above the relief for the finishing pass (mm). Default 0.5. */
+      allowance: nonNegative.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('finish3d'),
+    tool: id,
+    relief: id,
+    vectors: z.array(id),
+    params: z.strictObject({
+      /** Raster direction: lines along X, along Y, or both (X then Y). */
+      pattern: z.enum(['x', 'y', 'xy']),
+      /** Distance between raster lines (mm). Default: the tool's step-over. */
+      stepOver: positive.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
     type: z.literal('drill'),
     tool: id,
     vectors: z.array(id).min(1),
@@ -285,6 +312,9 @@ export const projectSchema = projectShape.superRefine((p, ctx) => {
   });
   p.toolpaths.forEach((tp, i) => {
     if (!tools.has(tp.tool)) missing(['toolpaths', i, 'tool'], 'tool', tp.tool);
+    if ('relief' in tp && !p.reliefs.some((r) => r.id === tp.relief)) {
+      missing(['toolpaths', i, 'relief'], 'relief', tp.relief);
+    }
     tp.vectors.forEach((v, j) => {
       if (!vectors.has(v)) missing(['toolpaths', i, 'vectors', j], 'vector', v);
     });
