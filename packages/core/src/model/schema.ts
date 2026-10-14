@@ -49,16 +49,57 @@ export const vectorSchema = z.strictObject({
 });
 
 export const reliefProfileSchema = z.enum(['flat', 'dome', 'angle', 'round']);
-export const combineModeSchema = z.enum(['add', 'subtract', 'mergeHigh', 'mergeLow']);
+export const combineModeSchema = z.enum(['add', 'subtract', 'mergeHigh', 'mergeLow', 'zero']);
 
+/**
+ * Relief operations, applied in order to a grid that starts at 0 (plan.md
+ * §4 "Relief"). The grid is derived from these ops, like toolpaths from
+ * their parameters, so undo/redo of an op is undo/redo of the relief.
+ */
 export const reliefOpSchema = z.discriminatedUnion('op', [
   z.strictObject({
     op: z.literal('fromVector'),
     vector: id,
+    /**
+     * flat: constant `height`; dome: smooth pillow peaking at `height`;
+     * angle: slopes up at `angle` degrees from the edge, capped at `height`;
+     * round: rounded edge of radius `height`, flat on top.
+     */
     profile: reliefProfileSchema,
     height: finite,
+    /** Slope for the angle profile, degrees (default 45). */
+    angle: positive.max(89).optional(),
+    /** Added under the profile (a raised base plate). Default 0. */
+    base: finite.optional(),
     mode: combineModeSchema,
   }),
+  z.strictObject({
+    op: z.literal('fromImage'),
+    /** Id of a grayscale image stored at images/<id>.gray in the project zip. */
+    image: id,
+    /** Image size in pixels. */
+    px: z.number().int().positive(),
+    py: z.number().int().positive(),
+    /** Placement rectangle on the material (mm, bottom-left corner). */
+    x: finite,
+    y: finite,
+    w: positive,
+    h: positive,
+    /** Height of white (or black when inverted), mm. */
+    height: finite,
+    invert: z.boolean().optional(),
+    /** Blur radius before use, mm. */
+    blur: nonNegative.optional(),
+    mode: combineModeSchema,
+  }),
+  z.strictObject({
+    op: z.literal('smooth'),
+    radius: positive,
+    passes: z.number().int().positive().max(20),
+  }),
+  z.strictObject({ op: z.literal('scale'), factor: finite }),
+  z.strictObject({ op: z.literal('offset'), amount: finite }),
+  z.strictObject({ op: z.literal('invert') }),
 ]);
 
 export const reliefSchema = z.strictObject({
@@ -237,7 +278,9 @@ export const projectSchema = projectShape.superRefine((p, ctx) => {
       });
     }
     r.ops.forEach((op, j) => {
-      if (!vectors.has(op.vector)) missing(['reliefs', i, 'ops', j, 'vector'], 'vector', op.vector);
+      if (op.op === 'fromVector' && !vectors.has(op.vector)) {
+        missing(['reliefs', i, 'ops', j, 'vector'], 'vector', op.vector);
+      }
     });
   });
   p.toolpaths.forEach((tp, i) => {

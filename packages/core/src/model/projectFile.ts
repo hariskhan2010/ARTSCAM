@@ -17,6 +17,29 @@ const ZIP_MTIME = new Date(1980, 0, 1);
 export interface ProjectBundle {
   project: Project;
   reliefData: Record<string, Float32Array>;
+  /** Grayscale images (one byte per pixel, rows top to bottom) used by image reliefs, by id. */
+  images?: Record<string, Uint8Array>;
+}
+
+/** Location of a relief image in the project zip. */
+export function imagePath(id: string): string {
+  return `images/${id}.gray`;
+}
+
+function checkImages(project: Project, images: Record<string, Uint8Array>): void {
+  for (const relief of project.reliefs) {
+    for (const op of relief.ops) {
+      if (op.op !== 'fromImage') continue;
+      const img = images[op.image];
+      if (!img)
+        throw new ProjectFileError(`Missing image "${op.image}" used by relief "${relief.id}"`);
+      if (img.length !== op.px * op.py) {
+        throw new ProjectFileError(
+          `Image "${op.image}" has ${img.length} pixels, expected ${op.px * op.py}`,
+        );
+      }
+    }
+  }
 }
 
 export class ProjectFileError extends Error {
@@ -72,6 +95,8 @@ function float32FromLE(bytes: Uint8Array): Float32Array {
 export function saveProject(bundle: ProjectBundle): Uint8Array {
   const project = validate(bundle.project, 'save');
   checkReliefData(project, bundle.reliefData);
+  const images = bundle.images ?? {};
+  checkImages(project, images);
 
   const files: Zippable = {
     [PROJECT_JSON_PATH]: strToU8(JSON.stringify(project, null, 2)),
@@ -83,6 +108,7 @@ export function saveProject(bundle: ProjectBundle): Uint8Array {
   }
   // Fixed entry timestamps make saves byte-for-byte deterministic (the file
   // system already records when the project was saved).
+  for (const [id, bytes] of Object.entries(images)) files[imagePath(id)] = bytes;
   return zipSync(files, { mtime: ZIP_MTIME });
 }
 
@@ -117,5 +143,12 @@ export function loadProject(bytes: Uint8Array): ProjectBundle {
   }
   checkReliefData(project, reliefData);
 
-  return { project, reliefData };
+  const images: Record<string, Uint8Array> = {};
+  for (const [path, bytes] of Object.entries(files)) {
+    const m = /^images\/(.+)\.gray$/.exec(path);
+    if (m) images[m[1] as string] = bytes;
+  }
+  checkImages(project, images);
+
+  return { project, reliefData, images };
 }

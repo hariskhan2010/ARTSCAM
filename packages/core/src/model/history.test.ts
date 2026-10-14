@@ -84,7 +84,7 @@ const removeLastUnusedVector = (): Command<Project> => ({
   label: 'Delete vector',
   apply: (p) => {
     const used = new Set([
-      ...p.reliefs.flatMap((r) => r.ops.map((o) => o.vector)),
+      ...p.reliefs.flatMap((r) => r.ops.flatMap((o) => (o.op === 'fromVector' ? [o.vector] : []))),
       ...p.toolpaths.flatMap((t) => t.vectors),
     ]);
     const victim = p.vectors.findLast((v) => !used.has(v.id));

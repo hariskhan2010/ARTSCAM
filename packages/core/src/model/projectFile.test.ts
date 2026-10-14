@@ -64,6 +64,7 @@ describe('project file round-trip', () => {
     expect(loadProject(saveProject({ project, reliefData: {} }))).toEqual({
       project,
       reliefData: {},
+      images: {},
     });
   });
 
@@ -195,7 +196,8 @@ describe('project schema cross-references', () => {
   it('flags dangling references', () => {
     const p = sampleProject();
     p.vectors[0]!.layer = 'nope';
-    p.reliefs[0]!.ops[0]!.vector = 'v9';
+    const op0 = p.reliefs[0]!.ops[0]!;
+    if (op0.op === 'fromVector') op0.vector = 'v9';
     p.toolpaths[0]!.tool = 't9';
     p.toolpaths[0]!.vectors = ['v1', 'v8'];
     expect(issues(p)).toEqual([

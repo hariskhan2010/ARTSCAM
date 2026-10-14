@@ -6,6 +6,7 @@ import {
   type Layer,
   type Machine,
   type Project,
+  type ReliefOp,
   type Segment,
   type Stock,
   type Tool,
@@ -96,7 +97,7 @@ export function deleteVectors(ids: readonly string[]): ProjectCommand {
         .filter((tp) => tp.vectors.length > 0) as Toolpath[];
       const reliefs = p.reliefs.map((r) => ({
         ...r,
-        ops: r.ops.filter((op) => !drop.has(op.vector)),
+        ops: r.ops.filter((op) => op.op !== 'fromVector' || !drop.has(op.vector)),
       }));
       return { ...p, vectors: p.vectors.filter((v) => !drop.has(v.id)), toolpaths, reliefs };
     },
@@ -295,5 +296,72 @@ export function deleteToolpath(id: string): ProjectCommand {
       p.toolpaths.some((t) => t.id === id)
         ? { ...p, toolpaths: p.toolpaths.filter((t) => t.id !== id) }
         : p,
+  };
+}
+
+// --- Reliefs (M4) -------------------------------------------------------------
+
+/** A new empty relief covering the material at `resolution` mm per cell. */
+export function addRelief(resolution: number, id?: string): ProjectCommand {
+  return {
+    label: 'New relief',
+    apply: (p) => {
+      if (!(resolution > 0)) return p;
+      const rid = id ?? nextId('r', p.reliefs);
+      const cols = Math.max(1, Math.ceil(p.stock.width / resolution));
+      const rows = Math.max(1, Math.ceil(p.stock.height / resolution));
+      return {
+        ...p,
+        reliefs: [
+          ...p.reliefs,
+          { id: rid, resolution, cols, rows, data: `reliefs/${rid}.f32`, ops: [] },
+        ],
+      };
+    },
+  };
+}
+
+export function deleteRelief(id: string): ProjectCommand {
+  return {
+    label: 'Delete relief',
+    apply: (p) =>
+      p.reliefs.some((r) => r.id === id)
+        ? { ...p, reliefs: p.reliefs.filter((r) => r.id !== id) }
+        : p,
+  };
+}
+
+const RELIEF_OP_LABEL: Record<ReliefOp['op'], string> = {
+  fromVector: 'Shape to relief',
+  fromImage: 'Image to relief',
+  smooth: 'Smooth relief',
+  scale: 'Scale relief',
+  offset: 'Offset relief',
+  invert: 'Invert relief',
+};
+
+/** Appends an op, or replaces the op at `index`. */
+export function setReliefOp(reliefId: string, op: ReliefOp, index?: number): ProjectCommand {
+  return {
+    label: RELIEF_OP_LABEL[op.op],
+    apply: (p) => {
+      const r = p.reliefs.find((x) => x.id === reliefId);
+      if (!r) return p;
+      const ops =
+        index === undefined ? [...r.ops, op] : r.ops.map((o, i) => (i === index ? op : o));
+      return { ...p, reliefs: p.reliefs.map((x) => (x.id === reliefId ? { ...x, ops } : x)) };
+    },
+  };
+}
+
+export function removeReliefOp(reliefId: string, index: number): ProjectCommand {
+  return {
+    label: 'Remove relief step',
+    apply: (p) => {
+      const r = p.reliefs.find((x) => x.id === reliefId);
+      if (!r || !r.ops[index]) return p;
+      const ops = r.ops.filter((_, i) => i !== index);
+      return { ...p, reliefs: p.reliefs.map((x) => (x.id === reliefId ? { ...x, ops } : x)) };
+    },
   };
 }
