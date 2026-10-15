@@ -15,17 +15,18 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - Offline mode (PWA): installable; after one visit the whole app, including fonts and text shaping, works with no server. Tested by shutting the server down.
 - **M4** Relief engine: relief grid covering the material; shape → flat/dome/angle/round with base height; combine add/subtract/merge high/merge low/zero; smooth, scale, offset, invert; image → relief (placement, height, invert, blur), images stored in the project zip; watertight binary STL export; Relief panel, canvas shading and a Three.js 3D view.
 - **M5** 3D CAM: relief placed with its top at the top of the material; drop-cutter for flat, ball, V and tapered tools (fast row-skipping scan, same result as a full scan); raster finishing (X, Y, X then Y) with a ball nose; Z-level roughing with an allowance; both in the Toolpaths panel with simulation, time estimate and checked export.
-- Checks: `pnpm run ci` (lint, typecheck, 348 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
+- **Time estimate (T2.6) checked against grbl-sim:** all 10 golden files within ±10% (most within ±5%); a unit test keeps it there. First moves from an unknown start are now timed from the work origin.
+- **Sender check (T2.5):** all 10 golden files stream to grbl-sim with no error, pass GRBL's own `gvalidate`, and load in CNCjs's G-code loader (`gcode-toolpath`) with correct size and units.
+- Checks: `pnpm run ci` (lint, typecheck, 350 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
 
 ## Blocked: needs you
 
 1. **First real cut (M2 acceptance).** Export a profile with tabs, air-cut with Z raised, then cut foam or soft wood. Check sizes (±0.2 mm).
 2. **Real calligraphy carve (M3 acceptance).** V-carve Nastaliq text in wood with a 60° or 90° V-bit.
-3. **Time estimate check (T2.6).** Compare the app's estimate with a GRBL simulator or a real run (target ±15%). Not yet verified.
-4. **G-code sender check (T2.5).** Load an exported `.nc` file into a sender's simulator (e.g. UGS, CNCjs).
-5. **Try Mach3/LinuxCNC output on a real controller.** It passes the checker, but hasn't run on real hardware.
-6. **First carved relief (M5 acceptance).** Rough with a flat end mill, then finish with a ball nose (air-cut first), on soft wood.
-7. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh"), licence (GPL vs MIT), and which controllers come after GRBL.
+3. **Time estimate on a real machine (optional).** Simulator check is done (see below); a stopwatch on one real job would confirm it.
+4. **Try Mach3/LinuxCNC output on a real controller.** It passes the checker, but hasn't run on real hardware.
+5. **First carved relief (M5 acceptance).** Rough with a flat end mill, then finish with a ball nose (air-cut first), on soft wood.
+6. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh") and which controllers come after GRBL. Licence is decided: MIT (`LICENSE`).
 
 ## Known gaps in finished milestones
 

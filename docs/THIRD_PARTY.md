@@ -34,3 +34,10 @@ Licences were read from each package's `package.json` after install.
 | @types/three | MIT | Three.js type definitions | T4.4 |
 | @playwright/test | Apache-2.0 | UI smoke tests (uses installed Chrome) | T1.4 |
 | @types/node, @types/react, @types/react-dom | MIT | Type definitions | T0.1 |
+
+## Verification tools (run outside the repo; no code copied or shipped)
+
+| Tool | Licence | Purpose | Used in |
+|---|---|---|---|
+| grbl (gnea/grbl 1.1h) + grbl-sim | GPL-3.0 | Reference run times for the time-estimate test (`fixtures/gcode/grbl-sim-times.json`) and GRBL's own parser check (`gvalidate`) on the golden files | T2.5/T2.6 checks |
+| gcode-toolpath 2.2.0 (CNCjs) | MIT | Loading the golden files the way the CNCjs sender does | T2.5 check |

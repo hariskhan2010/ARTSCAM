@@ -1,0 +1,15 @@
+{
+  "about": "Reference run times (seconds) of the golden files in grbl-sim (gnea/grbl 1.1h + grbl/grbl-sim, built in WSL Ubuntu 24.04), streamed line by line (send, wait for ok). Machine: $110-$112=5000, $120=500, $121=500, $122=200, $11=0.010, $12=0.002; start at X0 Y0 Z0. Time = first step to last step, includes dwells. Measured 2026-10-15. Re-measure if a golden file changes.",
+  "seconds": {
+    "cutout-inch.nc": 89.122,
+    "cutout.nc": 89.973,
+    "drill.nc": 28.586,
+    "finish3d.nc": 20.109,
+    "groove.nc": 19.27,
+    "holecut.nc": 48.919,
+    "pocket-offset.nc": 441.524,
+    "pocket-raster.nc": 519.601,
+    "rough3d.nc": 19.577,
+    "vcarve.nc": 96.142
+  }
+}

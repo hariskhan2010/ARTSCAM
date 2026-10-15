@@ -49,3 +49,7 @@ pnpm run ci     # lint, typecheck, test, build
 Packages: `packages/core` (UI-free model, geometry, CAM, G-code checker) and `packages/app` (React PWA).
 Golden files: `fixtures/vector/clip-golden.json` and `fixtures/gcode/golden/*.nc`. After an intended
 output change, regenerate them with `UPDATE_GOLDEN=1 pnpm --filter @naqsh/core test`, then review the diff.
+
+## Licence
+
+MIT. See `LICENSE`. Third-party licences are listed in `docs/THIRD_PARTY.md`.

@@ -529,7 +529,8 @@ describe('time estimate', () => {
   });
 
   it('a single feed move: length / feed plus acceleration', () => {
-    const g = parseGcode('G21 G90 G54\nM3 S1000\nG0 Z5\nG0 X0 Y0\nG1 X100 F600\n');
+    // M3 just before the cut: the spindle change stops the planner, so the cut starts at rest.
+    const g = parseGcode('G21 G90 G54\nG0 Z5\nG0 X0 Y0\nM3 S1000\nG1 X100 F600\n');
     const t = estimateTime(g, { maxFeed: 5000, acceleration: [100, 100, 100] });
     // Cutting: 100 mm at 10 mm/s: 10 s + 0.1 s for accel/decel.
     expect(t.cuttingSeconds).toBeCloseTo(10.1, 6);
@@ -543,6 +544,33 @@ describe('time estimate', () => {
     expect(slow.cuttingSeconds).toBeGreaterThan(fast.cuttingSeconds);
     const dwell = estimateTime(parseGcode(square + 'G4 P2.5\n'), { maxFeed: 5000 });
     expect(dwell.dwellSeconds).toBe(2.5);
+  });
+
+  it('moves from an unknown start are timed from the work origin (where GRBL starts)', () => {
+    // G0 Z5 then G0 X100: neither start is known; both are timed from X0 Y0 Z0.
+    const t = estimateTime(parseGcode('G21 G90 G54\nG0 Z5\nG0 X100\n'), { maxFeed: 6000 });
+    expect(t.rapidLength).toBeCloseTo(105, 9);
+  });
+
+  it('is within ±15% of grbl-sim for every golden file (T2.6 acceptance)', () => {
+    const ref = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../../../fixtures/gcode/grbl-sim-times.json', import.meta.url)),
+        'utf8',
+      ),
+    ) as { seconds: Record<string, number> };
+    const machine = {
+      maxFeed: 5000,
+      acceleration: [500, 500, 200] as [number, number, number],
+      junctionDeviation: 0.01,
+    };
+    for (const [file, sim] of Object.entries(ref.seconds)) {
+      const est = estimateTime(parseGcode(readFileSync(goldenDir + file, 'utf8')), machine).seconds;
+      expect(
+        Math.abs(est - sim) / sim,
+        `${file}: estimate ${est.toFixed(1)} s, grbl-sim ${sim} s`,
+      ).toBeLessThan(0.15);
+    }
   });
 
   it('is sane for the fixture toolpaths and formats durations', () => {

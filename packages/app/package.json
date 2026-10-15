@@ -2,6 +2,7 @@
   "name": "@naqsh/app",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Browser app (React PWA) for Naqsh",
   "type": "module",
   "scripts": {

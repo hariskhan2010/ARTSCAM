@@ -12,7 +12,9 @@ import type { Machine } from '../model/schema';
  * - the planner only looks `bufferBlocks` ahead, so speed is also limited by
  *   being able to stop within the queued blocks (GRBL's buffer);
  * - every block runs a trapezoid (or triangle) velocity profile;
- * - dwells (G4 P) add their time; the program starts and ends at rest.
+ * - dwells (G4 P) add their time; the program starts and ends at rest;
+ * - axes not yet set count as 0 (the work origin), so the first moves are timed.
+ *   Checked against grbl-sim (fixtures/gcode/grbl-sim-times.json).
  *
  * The estimate reads the G-code text (via the parser), not the internal model.
  */
@@ -101,11 +103,10 @@ export function estimateTime(
 
     let prev = m.from;
     for (const p of m.points) {
-      const [fx, fy, fz] = prev;
-      const [tx, ty, tz] = p;
+      // An axis not yet set is at the work origin, where GRBL starts after zeroing.
+      const [fx, fy, fz] = prev.map((v) => v ?? 0) as [number, number, number];
+      const [tx, ty, tz] = p.map((v) => v ?? 0) as [number, number, number];
       prev = p;
-      if (fx === null || fy === null || fz === null || tx === null || ty === null || tz === null)
-        continue;
       const dx = tx - fx;
       const dy = ty - fy;
       const dz = tz - fz;

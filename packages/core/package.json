@@ -2,6 +2,7 @@
   "name": "@naqsh/core",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "UI-free document model, geometry, CAM and G-code safety core",
   "type": "module",
   "main": "./src/index.ts",

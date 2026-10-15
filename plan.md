@@ -315,7 +315,7 @@ Each task is one PR. Don't start a task until the previous one's acceptance chec
 ## 15. Open decisions
 
 1. Final name (replace "ARTSCAM").
-2. Licence: GPL-3.0 (protects against closed forks) vs MIT/Apache-2.0 (easier adoption).
+2. ~~Licence~~ Decided 2026-10-15: **MIT** (easier adoption). See `LICENSE`.
 3. Target users: confirm wood/signs first, jewelry later.
 4. Machines: confirm GRBL first; which Mach3/DSP controllers come next.
 5. Which existing project is paused while this runs (video editor, Screen Firewall)?
