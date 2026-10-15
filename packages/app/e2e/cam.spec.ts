@@ -10,7 +10,7 @@ async function drag(page: Page, from: [number, number], to: [number, number]) {
 }
 
 test('M2 flow: tool → profile → simulate → export, blocked until simulated', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-rect').click();
   await drag(page, [300, 300], [500, 450]);
   await expect(page.getByTestId('vector-count')).toHaveText('1 vectors');
@@ -50,7 +50,7 @@ test('M2 flow: tool → profile → simulate → export, blocked until simulated
 });
 
 test('checker errors block export even after simulation', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-rect').click();
   await drag(page, [300, 300], [400, 400]);
   await page.getByTestId('tab-cam').click();

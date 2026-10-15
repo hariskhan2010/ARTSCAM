@@ -5,13 +5,17 @@ import base from './playwright.config';
 process.env.NAQSH_PROD = '1';
 
 // Same UI tests against the production build (vite build + preview), so
-// bundling problems (workers, WASM, assets) are caught too.
+// bundling problems (workers, WASM, assets) are caught too. With NAQSH_BASE
+// (e.g. /ARTSCAM/, as on GitHub Pages) the app is built and served under it.
+const path = process.env.NAQSH_BASE ?? '/';
+const url = `http://localhost:5175${path}`;
+
 export default defineConfig({
   ...base,
-  use: { ...base.use, baseURL: 'http://localhost:5175' },
+  use: { ...base.use, baseURL: url },
   webServer: {
     command: 'pnpm exec vite build && pnpm exec vite preview --port 5175 --strictPort',
-    url: 'http://localhost:5175',
+    url,
     reuseExistingServer: false,
     timeout: 180_000,
   },

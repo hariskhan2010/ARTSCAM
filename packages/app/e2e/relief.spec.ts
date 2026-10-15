@@ -10,7 +10,7 @@ async function drag(page: Page, from: [number, number], to: [number, number]) {
 }
 
 test('M4: shape → dome relief, 3D view, STL export, undo', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-ellipse').click();
   await drag(page, [300, 260], [520, 420]);
   await expect(page.getByTestId('vector-count')).toHaveText('1 vectors');
@@ -42,7 +42,7 @@ test('M4: shape → dome relief, 3D view, STL export, undo', async ({ page }) =>
 test('M5: relief → 3D rough and finish → simulate → export', async ({ page }) => {
   // Generates, simulates and exports two full-material 3D toolpaths.
   test.setTimeout(90_000);
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-ellipse').click();
   await drag(page, [380, 300], [480, 380]);
   await page.getByTestId('tab-relief').click();

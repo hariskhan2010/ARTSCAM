@@ -30,7 +30,7 @@ async function click(page: Page, at: [number, number]) {
 const count = (page: Page) => page.getByTestId('vector-count');
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.getByTestId('canvas')).toBeVisible();
 });
 

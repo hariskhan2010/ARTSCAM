@@ -7,7 +7,7 @@ async function clickCanvas(page: Page, at: [number, number]) {
 }
 
 test('M3: Urdu text with the Text tool, V-carved, simulated and exported', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-text').click();
   await clickCanvas(page, [450, 450]);
 
@@ -41,7 +41,7 @@ test('M3: Urdu text with the Text tool, V-carved, simulated and exported', async
 test('text stays editable after it is added and moved; the edit undoes in one step', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-text').click();
   await clickCanvas(page, [400, 400]);
   await page.getByTestId('text-size').fill('30');
@@ -76,7 +76,7 @@ test('text stays editable after it is added and moved; the edit undoes in one st
 test('text: Escape cancels, mixed Urdu and English shapes without missing glyphs', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-text').click();
   await clickCanvas(page, [400, 400]);
   await page.getByTestId('text-input').fill('پاکستان Zindabad 2024');

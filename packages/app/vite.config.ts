@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { serviceWorker } from './src/sw-plugin';
 
 export default defineConfig({
+  // Served from a sub-path on GitHub Pages (NAQSH_BASE=/ARTSCAM/); '/' locally.
+  base: process.env.NAQSH_BASE ?? '/',
   plugins: [react(), serviceWorker()],
   server: { port: 5173 },
   // HarfBuzz finds its .wasm next to its own module; pre-bundling would move it.

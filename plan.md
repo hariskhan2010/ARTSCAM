@@ -295,6 +295,16 @@ at each point is measured from the straight line between its ends.
 | T6.5 Sculpt brushes: raise, lower, smooth strokes stored as relief ops (undoable, saved) | A stroke changes heights only within its radius, by the strength set; undo restores the grid |
 | T6.6 Sweeps, textures and sculpting in the Relief panel | Playwright: rebuild a small panel (border extrude, spun rosette, texture, sculpt touch-up) → 3D view → finish toolpath exports |
 
+**M7: public beta** (recruiting the 10 pilot users and their real cuts are done by people, not code)
+
+| Task | Acceptance check |
+|---|---|
+| T7.1 Beta on GitHub Pages: deployed by CI after the checks pass, works under the `/ARTSCAM/` path and offline | Production browser tests pass when served under a sub-path; deploy job runs only on main after CI |
+| T7.2 Sample projects: sign (profile + pocket + drill), Urdu calligraphy V-carve, relief panel (M4–M6), opened from Help › Samples | Every sample loads, validates, and every toolpath exports with the checker passing; Playwright opens one |
+| T7.3 User guide (`docs/guide/`): first run, safety checklist before the first cut, drawing, text, CAM, reliefs, 3D CAM, sweeps; linked from Help | Every guide page exists and is linked; the safety checklist matches plan.md §7 |
+| T7.4 Bug triage: issue forms (bug with project + G-code + machine, feature request), Help › Report a problem (prefilled version and browser), Help › About with the version | Issue forms are valid; the report link carries the version; About shows it |
+| T7.5 Pilot kit (`docs/PILOT.md`): who to invite, what to cut, how to report, what we measure | Covers the M7 "done when" and the §12 evaluation numbers |
+
 ## 12. Evaluation
 
 | Metric | How |

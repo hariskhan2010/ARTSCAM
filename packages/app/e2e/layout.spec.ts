@@ -19,7 +19,7 @@ async function shot(page: Page, name: string) {
 test('menu bar: menus in order, items run actions, unbuilt items say "Coming later"', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   const titles = await page.getByRole('menubar').locator('.menu-title').allTextContents();
   expect(titles).toEqual([
     'File',
@@ -65,7 +65,7 @@ test('menu bar: menus in order, items run actions, unbuilt items say "Coming lat
 });
 
 test('2D / 3D view tabs and the relief toolbar', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('tool-ellipse').click();
   await drag(page, [250, 200], [400, 320]);
   await expect(page.getByTestId('view-2d')).toHaveAttribute('aria-selected', 'true');
@@ -87,7 +87,7 @@ test('2D / 3D view tabs and the relief toolbar', async ({ page }) => {
 test('project tree shows its panels; + buttons create things; status shows X Y Z and W H', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('./');
   const tree = page.getByRole('tree', { name: 'Project' });
   const rows = await tree.locator('.tree-row > .tree-label').allTextContents();
   expect(rows).toEqual([
@@ -144,7 +144,7 @@ test('project tree shows its panels; + buttons create things; status shows X Y Z
 test.describe('dark mode', () => {
   test.use({ colorScheme: 'dark' });
   test('menus, toolbars, tree and rulers follow the dark theme', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('./');
     await page.getByTestId('tool-star').click();
     await drag(page, [300, 250], [380, 330]);
     await page.getByTestId('tb-shape-relief').click();
@@ -166,7 +166,7 @@ test.describe('dark mode', () => {
 
 test('usable at 1366 × 551: everything in reach without page scroll', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 551 });
-  await page.goto('/');
+  await page.goto('./');
   for (const id of ['menu-help', 'tb-delete', 'tb-tp-finish3d', 'tool-clipart', 'tab-cam']) {
     await expect(page.getByTestId(id)).toBeInViewport();
   }

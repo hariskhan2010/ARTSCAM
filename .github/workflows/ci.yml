@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -19,6 +22,40 @@ jobs:
       - run: pnpm test:e2e
         env:
           CI: 'true'
+      # The production build, served under the same sub-path as GitHub Pages.
       - run: pnpm --filter @naqsh/app test:e2e:prod
         env:
           CI: 'true'
+          NAQSH_BASE: /ARTSCAM/
+
+  # Public beta (plan.md T7.1): main is published to GitHub Pages, only after every check passed.
+  deploy:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          NAQSH_BASE: /ARTSCAM/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/app/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

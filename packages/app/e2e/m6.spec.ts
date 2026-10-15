@@ -27,7 +27,7 @@ test('M6: border extrude, spun rosette, texture and a sculpt stroke → 3D → f
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto('/');
+  await page.goto('./');
 
   // Frame (the rail) and a small open cross-section inside it, drawn with the pen.
   await page.getByTestId('tool-rect').click();

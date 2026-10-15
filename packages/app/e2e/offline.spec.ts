@@ -19,10 +19,15 @@ const TYPES: Record<string, string> = {
   '.webmanifest': 'application/manifest+json',
 };
 
-/** Serves dist/ on a free port; the test shuts it down to go truly offline. */
+/** The sub-path the build was made for (NAQSH_BASE, e.g. /ARTSCAM/ on GitHub Pages). */
+const prefix = process.env.NAQSH_BASE ?? '/';
+
+/** Serves dist/ under the prefix on a free port; the test shuts it down to go truly offline. */
 function serveDist(): Promise<{ server: Server; url: string }> {
   const server = createServer(async (req, res) => {
-    const path = new URL(req.url ?? '/', 'http://x').pathname;
+    const full = new URL(req.url ?? '/', 'http://x').pathname;
+    if (!full.startsWith(prefix)) return res.writeHead(404).end();
+    const path = '/' + full.slice(prefix.length);
     const file = normalize(join(dist, path === '/' ? 'index.html' : path));
     if (!file.startsWith(normalize(dist))) return res.writeHead(403).end();
     try {
@@ -35,7 +40,10 @@ function serveDist(): Promise<{ server: Server; url: string }> {
   });
   return new Promise((resolve) =>
     server.listen(0, '127.0.0.1', () =>
-      resolve({ server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/` }),
+      resolve({
+        server,
+        url: `http://127.0.0.1:${(server.address() as AddressInfo).port}${prefix}`,
+      }),
     ),
   );
 }
