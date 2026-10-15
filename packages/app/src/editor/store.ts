@@ -33,7 +33,8 @@ export type ToolName =
   | 'line'
   | 'text'
   | 'pan'
-  | 'sculpt';
+  | 'sculpt'
+  | 'arc';
 
 /** Text being placed with the Text tool (not part of the document until added). */
 export interface TextDraft {

@@ -295,6 +295,20 @@ at each point is measured from the straight line between its ends.
 | T6.5 Sculpt brushes: raise, lower, smooth strokes stored as relief ops (undoable, saved) | A stroke changes heights only within its radius, by the strength set; undo restores the grid |
 | T6.6 Sweeps, textures and sculpting in the Relief panel | Playwright: rebuild a small panel (border extrude, spun rosette, texture, sculpt touch-up) → 3D view → finish toolpath exports |
 
+**M6.5: tools ex-ArtCAM users expect** (from docs/research/feature-gap.md; built after the M7 beta went live)
+
+| Task | Acceptance check |
+|---|---|
+| T6.7 Vector basics: arc tool, fillet and chamfer corners, arrays (grid, circular), align and distribute, join open vectors, vector repair (close small gaps, remove duplicates and zero-length segments) | Unit tests per operation (exact geometry); Playwright: arc + array + align, undo |
+| T6.8 Text on a curve | Glyphs follow the curve at the set offset and spacing; still editable; V-carves |
+| T6.9 Relief edits: fade, trim to a shape, zero inside/outside, scale inside a shape | Heights match the formulas; cells outside the shape untouched |
+| T6.10 Relief clipart: paste a saved relief (place, scale, rotate), STL/OBJ import, starter library | Imported mesh heights match the mesh within a cell; paste is one undoable step |
+| T6.11 Relief layers: stack, combine mode per layer, show/hide, sculpt erase | Layers combine in order; hiding a layer removes it from the result and toolpaths |
+| T6.12 2D toolpaths: fluting, chamfer, bevel (prism) carving, inlay (plug + pocket), pocket rest machining | Golden G-code; checker passes; simulated result matches the intent |
+| T6.13 3D finishing: spiral, 3D offset, raster at any angle, 3D rest machining | No gouges in simulation; rest pass only where the big tool could not reach |
+| T6.14 Bitmap trace: image → vectors | Traced outline within one pixel of the image edge |
+| T6.15 More posts (DSP/Richauto-style, ShopBot, Centroid) | Golden files; checker passes; needs a sample file from a real controller |
+
 **M7: public beta** (recruiting the 10 pilot users and their real cuts are done by people, not code)
 
 | Task | Acceptance check |

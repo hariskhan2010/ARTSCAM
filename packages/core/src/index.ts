@@ -11,6 +11,7 @@ export * from './vector/path';
 export * from './vector/flatten';
 export * from './vector/clip';
 export * from './vector/shapes';
+export * from './vector/edit';
 export * from './vector/svg';
 export * from './vector/dxf';
 export { parseXml, XmlError, type XmlElement } from './vector/xml';

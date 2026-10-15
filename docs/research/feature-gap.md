@@ -12,13 +12,13 @@ panel and calligraphy work), **P2** later, **P3** niche. Effort: S (days), M (1�
 
 | Area | Have | Partial | Missing |
 |---|---|---|---|
-| Vector and text tools | 9 | 2 | 17 |
+| Vector and text tools | 14 | 2 | 12 |
 | Bitmap tools | 1 | 0 | 3 |
 | Relief (3D design) tools | 11 | 4 | 21 |
 | 2D toolpaths | 7 | 2 | 17 |
 | 3D toolpaths | 4 | 1 | 11 |
 | Simulation, files, machines | 3 | 2 | 6 |
-| **Total** | **35** | **11** | **75** |
+| **Total** | **40** | **11** | **70** |
 
 Counts are table rows; one row can group several related tools.
 
@@ -41,11 +41,11 @@ on a curve**, **vector arcs, fillets and arrays**, **bitmap tracing**, **more fi
 | Snapping, rulers, typed size/position | ✅ | | | |
 | SVG and DXF import, SVG and DXF export | ✅ | | | |
 | Text (Urdu, Arabic, Latin; own fonts; editable) | ✅ | | | |
-| Arc tool | ❌ | Placeholder in tool strip | P1 | S |
-| Fillet / chamfer corners | ❌ | Round or cut the corner between two lines | P1 | S |
-| Block copy / array (grid and circular) | ❌ | Rosettes, border repeats, fence panels | P1 | S |
-| Align and distribute | ❌ | | P1 | S |
-| Join / close open vectors, "vector doctor" (fix gaps, overlaps, duplicates) | ❌ | Imported DXFs often need it | P1 | M |
+| Arc tool | ✅ | Three clicks (T6.7) | | |
+| Fillet / chamfer corners | ✅ | T6.7 | | |
+| Block copy / array (grid and circular) | ✅ | T6.7 | | |
+| Align and distribute | ✅ | T6.7 | | |
+| Join / close open vectors, "vector doctor" (fix gaps, overlaps, duplicates) | ✅ | Join + Repair (T6.7); overlapping shapes are not detected yet | | |
 | Text on a curve | ❌ | Very common on plaques and mosque panels | P1 | M |
 | Single-stroke (engraving) fonts | ❌ | For engraving and V-carved small text | P2 | M |
 | Guide lines | ❌ | | P2 | S |

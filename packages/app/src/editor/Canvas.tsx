@@ -1,5 +1,6 @@
 import {
   addVectors,
+  arcThrough,
   gridRange,
   type Grid,
   deleteVectors,
@@ -269,6 +270,8 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
   const dragRef = useRef<Drag | undefined>(undefined);
   const previewRef = useRef<Preview | undefined>(undefined);
   const penRef = useRef<PenNode[]>([]);
+  /** Arc tool: start and end clicked so far (the third click sets the bulge). */
+  const arcRef = useRef<[number, number][]>([]);
   const nodeSelRef = useRef<{ id: string; ref: NodeRef } | undefined>(undefined);
   const spaceRef = useRef(false);
   const closeHoverRef = useRef(false);
@@ -695,6 +698,34 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       return;
     }
 
+    if (tool === 'arc') {
+      const q = snapped(p);
+      const pts = arcRef.current;
+      if (pts.length < 2) {
+        pts.push([q[0], q[1]]);
+        previewRef.current =
+          pts.length === 2
+            ? { kind: 'draft', segments: line(pts[0] as Vec2, pts[1] as Vec2), closed: false }
+            : undefined;
+      } else {
+        // Third click: the arc runs from the start through this point to the end.
+        const a = pts[0] as Vec2;
+        const b = pts[1] as Vec2;
+        arcRef.current = [];
+        previewRef.current = undefined;
+        store.execute(
+          addVectors(
+            [{ layer: store.ui.activeLayer, closed: false, segments: arcThrough(a, q, b) }],
+            'Draw arc',
+          ),
+        );
+        const last = store.doc.vectors.at(-1);
+        if (last) store.select([last.id]);
+      }
+      draw();
+      return;
+    }
+
     if (tool === 'sculpt') {
       // Raw (unsnapped) brush path; becomes one relief step on release.
       dragRef.current = { kind: 'sculpt', points: [[p[0], p[1]]] };
@@ -746,6 +777,17 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     const p = toWorld(e);
     if (!dragRef.current) {
       store.setUi({ cursor: p });
+      if (store.ui.tool === 'arc' && arcRef.current.length > 0) {
+        const q = snapped(p);
+        const a = arcRef.current[0] as Vec2;
+        const b: Vec2 | undefined = arcRef.current[1];
+        previewRef.current = {
+          kind: 'draft',
+          segments: b ? arcThrough(a, q, b) : line(a, q),
+          closed: false,
+        };
+        draw();
+      }
       if (store.ui.tool === 'pen' && penRef.current.length > 0) {
         const q = snapped(p);
         const nodes = penRef.current;
@@ -1011,6 +1053,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         setPenCount(0);
         closeHoverRef.current = false;
         penRef.current = [];
+        arcRef.current = [];
         previewRef.current = undefined;
         nodeSelRef.current = undefined;
         if (store.ui.tool === 'select') store.select([]);
@@ -1059,10 +1102,12 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         h: 'pan',
         t: 'text',
         b: 'sculpt',
+        a: 'arc',
       };
       const t = tools[key];
       if (t) {
         penRef.current = [];
+        arcRef.current = [];
         previewRef.current = undefined;
         store.setUi({ tool: t });
       }
@@ -1091,8 +1136,9 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     }
   }, [ui.textDraft]);
 
-  // Switching tools abandons an unfinished pen path.
+  // Switching tools abandons an unfinished pen path or arc.
   useEffect(() => {
+    if (ui.tool !== 'arc') arcRef.current = [];
     if (ui.tool !== 'pen' && penRef.current.length) {
       penRef.current = [];
       previewRef.current = undefined;

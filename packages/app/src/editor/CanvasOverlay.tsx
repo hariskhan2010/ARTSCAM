@@ -70,6 +70,17 @@ export const TOOL_INFO: Record<
   polygon: { name: 'Polygon', icon: Hexagon, key: 'G', steps: ['Drag out from the centre'] },
   star: { name: 'Star', icon: Star, key: 'S', steps: ['Drag out from the centre'] },
   line: { name: 'Line', icon: Slash, key: 'L', steps: ['Drag to draw a straight line'] },
+  arc: {
+    name: 'Arc',
+    icon: Spline,
+    key: 'A',
+    steps: [
+      'Click the start',
+      'Click the end',
+      'Click a point the arc passes through',
+      'Esc cancels',
+    ],
+  },
   text: {
     name: 'Text',
     icon: Type,

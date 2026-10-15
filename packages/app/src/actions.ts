@@ -2,6 +2,17 @@ import {
   addRelief,
   addToolpath,
   addVectors,
+  alignOffsets,
+  bbox,
+  chamferCorners,
+  circularArrayMatrices,
+  distributeOffsets,
+  filletCorners,
+  gridArrayMatrices,
+  joinOpenPaths,
+  repairSegments,
+  setVectorSegments,
+  type AlignMode,
   booleanOp,
   composite,
   deleteVectors,
@@ -222,6 +233,8 @@ export function selectAll(store: EditorStore): void {
 
 /** Flattening tolerance for booleans/offsets (mm). */
 const GEOM_TOL = 0.01;
+/** Ends closer than this (mm) count as touching when joining or repairing shapes. */
+const JOIN_TOL = 0.05;
 
 /** Closed rings of the given vectors (open vectors are ignored). */
 export function ringsOf(vectors: readonly Vector[]): Vec2[][] {
@@ -315,6 +328,173 @@ export function transformSelection(store: EditorStore, kind: QuickTransform): vo
             ? [rotation(-Math.PI / 2, cx, cy), 'Rotate']
             : [translation(width / 2 - cx, height / 2 - cy), 'Centre on material'];
   store.execute(transformVectors(ids, m, label));
+}
+
+// --- Vector editing tools (T6.7) ---------------------------------------------------
+
+/** Rounds (fillet) or cuts (chamfer) the line–line corners of the selected shapes. */
+export function cornerSelection(
+  store: EditorStore,
+  kind: 'fillet' | 'chamfer',
+  size: number,
+): void {
+  const sel = selectedVectors(store);
+  if (!sel.length) {
+    store.setUi({ message: 'Select shapes first' });
+    return;
+  }
+  const label = kind === 'fillet' ? 'Fillet corners' : 'Chamfer corners';
+  const changed = sel.flatMap((v) => {
+    const segs =
+      kind === 'fillet'
+        ? filletCorners(v.segments, size, v.closed)
+        : chamferCorners(v.segments, size, v.closed);
+    return segs === v.segments || JSON.stringify(segs) === JSON.stringify(v.segments)
+      ? []
+      : [setVectorSegments(v.id, segs, v.closed, label)];
+  });
+  if (!changed.length) {
+    store.setUi({ message: 'No corners between straight lines in the selection' });
+    return;
+  }
+  store.execute(composite(label, changed));
+}
+
+/** Copies the selection in a grid (cols × rows at dx, dy apart). */
+export function gridArraySelection(
+  store: EditorStore,
+  cols: number,
+  rows: number,
+  dx: number,
+  dy: number,
+): void {
+  const ids = selectedVectors(store).map((v) => v.id);
+  if (!ids.length) return store.setUi({ message: 'Select shapes first' });
+  const ms = gridArrayMatrices(cols, rows, dx, dy).slice(1);
+  if (!ms.length) return;
+  store.execute(
+    composite(
+      'Array',
+      ms.map((m) => duplicateVectors(ids, m)),
+    ),
+  );
+}
+
+/** Copies the selection around a centre: `count` in all (including the original) over `degrees`. */
+export function circularArraySelection(
+  store: EditorStore,
+  count: number,
+  centre: Vec2,
+  degrees: number,
+): void {
+  const ids = selectedVectors(store).map((v) => v.id);
+  if (!ids.length) return store.setUi({ message: 'Select shapes first' });
+  const ms = circularArrayMatrices(count, centre, degrees).slice(1);
+  if (!ms.length) return;
+  store.execute(
+    composite(
+      'Circular array',
+      ms.map((m) => duplicateVectors(ids, m)),
+    ),
+  );
+}
+
+function selectionBoxes(store: EditorStore) {
+  return selectedVectors(store).flatMap((v) => {
+    const b = bbox(v.segments);
+    return b ? [{ id: v.id, box: b }] : [];
+  });
+}
+
+/** Lines the selected shapes up on an edge or centre of the selection. */
+export function alignSelection(store: EditorStore, mode: AlignMode): void {
+  const items = selectionBoxes(store);
+  if (items.length < 2) return store.setUi({ message: 'Select two or more shapes to align' });
+  const offs = alignOffsets(
+    items.map((i) => i.box),
+    mode,
+  );
+  store.execute(
+    composite(
+      'Align',
+      items.map((it, k) => {
+        const [dx, dy] = offs[k] as [number, number];
+        return transformVectors([it.id], translation(dx, dy), 'Align');
+      }),
+    ),
+  );
+}
+
+/** Spaces the selected shapes with equal gaps (left to right, or bottom to top). */
+export function distributeSelection(store: EditorStore, axis: 'x' | 'y'): void {
+  const items = selectionBoxes(store);
+  if (items.length < 3)
+    return store.setUi({ message: 'Select three or more shapes to distribute' });
+  const offs = distributeOffsets(
+    items.map((i) => i.box),
+    axis,
+  );
+  store.execute(
+    composite(
+      'Distribute',
+      items.map((it, k) => {
+        const [dx, dy] = offs[k] as [number, number];
+        return transformVectors([it.id], translation(dx, dy), 'Distribute');
+      }),
+    ),
+  );
+}
+
+/** Joins the selected open shapes whose ends meet (within 0.05 mm). */
+export function joinSelection(store: EditorStore): void {
+  const open = selectedVectors(store).filter((v) => !v.closed);
+  if (open.length < 2) return store.setUi({ message: 'Select two or more open shapes to join' });
+  const joined = joinOpenPaths(
+    open.map((v) => v.segments),
+    JOIN_TOL,
+  );
+  if (joined.length === open.length)
+    return store.setUi({ message: 'None of the selected shapes have ends that meet' });
+  const layer = (open[0] as Vector).layer;
+  store.execute(
+    composite('Join', [
+      deleteVectors(open.map((v) => v.id)),
+      addVectors(
+        joined.map((j) => ({ layer, closed: j.closed, segments: j.segments })),
+        'Join',
+      ),
+    ]),
+  );
+  store.select(store.doc.vectors.slice(-joined.length).map((v) => v.id));
+  store.setUi({ message: `Joined ${open.length} shapes into ${joined.length}` });
+}
+
+/**
+ * Cleans the selected shapes: removes zero-length pieces and repeated points,
+ * closes shapes whose ends nearly meet, and deletes exact duplicates.
+ */
+export function repairSelection(store: EditorStore): void {
+  const sel = selectedVectors(store);
+  if (!sel.length) return store.setUi({ message: 'Select shapes first' });
+  let fixes = 0;
+  const seen = new Set<string>();
+  const dupes: string[] = [];
+  const edits = sel.flatMap((v) => {
+    const key = JSON.stringify([v.closed, v.segments]);
+    if (seen.has(key)) {
+      dupes.push(v.id);
+      return [];
+    }
+    seen.add(key);
+    const r = repairSegments(v.segments, v.closed, JOIN_TOL);
+    fixes += r.fixes;
+    return r.fixes ? [setVectorSegments(v.id, r.segments, r.closed, 'Repair')] : [];
+  });
+  if (!edits.length && !dupes.length) return store.setUi({ message: 'Nothing to repair' });
+  store.execute(composite('Repair', [...edits, ...(dupes.length ? [deleteVectors(dupes)] : [])]));
+  store.setUi({
+    message: `Repaired: ${fixes} fix${fixes === 1 ? '' : 'es'}, ${dupes.length} duplicate${dupes.length === 1 ? '' : 's'} removed`,
+  });
 }
 
 // --- Relief -------------------------------------------------------------------

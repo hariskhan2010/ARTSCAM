@@ -7,6 +7,7 @@ Pick a tool on the left (or press its key) and drag on the canvas:
 - **Rectangle (R)**, **Ellipse (E)**: hold Shift for a square or circle.
 - **Polygon (G)**, **Star (S)**: drag out from the centre.
 - **Line (L)**: a straight open line.
+- **Arc (A)**: click the start, click the end, then click a point the arc passes through.
 - **Pen (P)**: click for corners, click and drag for curves. Click the first point to close the
   shape, or press Enter (or Finish) to leave it open.
 
@@ -34,6 +35,18 @@ others out of the first one you selected, **Intersect** keeps only the overlap. 
 with **Outward** or **Inward** adds a new outline that far outside or inside each shape. Mirror,
 flip, rotate, centre, duplicate and delete are in the Selected shape panel and on
 the toolbar.
+
+## Corners, arrays and lining up
+
+In **Arrange and edit** (Vectors panel), with shapes selected:
+
+- **Fillet** rounds, **Chamfer** cuts every corner between two straight lines, by the corner size.
+- **Join** links open shapes whose ends meet (closing them if they form a loop); **Repair** removes
+  zero-length pieces and duplicate shapes and closes shapes whose ends nearly meet. Use it on imported
+  DXF files.
+- **Align** left, centre, right, top, middle or bottom; **Space across / Space up** gives equal gaps.
+- **Grid array** copies the selection into columns and rows; **Circular array** copies it around a
+  centre (the material centre unless you type one) over an angle.
 
 ## Layers
 

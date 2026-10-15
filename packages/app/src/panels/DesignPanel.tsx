@@ -39,6 +39,7 @@ import { useState } from 'react';
 import { selectionBBox } from '../editor/geometry';
 import type { EditorStore } from '../editor/store';
 import { Btn, Hint, NumberField, Section, SelectField } from './common';
+import { ArrangeSection } from './ArrangeSection';
 import {
   booleanSelection,
   editText,
@@ -400,6 +401,7 @@ export function DesignPanel({ store }: { store: EditorStore }) {
     <div className="sidebar-scroll">
       <SelectionSection store={store} />
       <ShapeOpsSection store={store} />
+      <ArrangeSection store={store} />
       <LayersSection store={store} />
       <MaterialSection store={store} />
     </div>

@@ -440,7 +440,7 @@ export function toolStrip(store: EditorStore): IconEntry[] {
     tool('ellipse', Circle, 'Ellipse', 'E'),
     tool('star', Star, 'Star', 'S'),
     tool('polygon', Hexagon, 'Polygon', 'G'),
-    { icon: ArcIcon, title: 'Arc', later: true, testId: 'tool-arc' },
+    tool('arc', ArcIcon, 'Arc (3 clicks)', 'A'),
     tool('text', Type, 'Text', 'T'),
     'sep',
     tool('sculpt', Brush, 'Sculpt relief', 'B'),
