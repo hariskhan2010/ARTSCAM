@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
+/** Optional screenshots for a visual check: SHOTS=<dir> pnpm test:e2e text-vcarve. */
+async function shot(page: Page, name: string) {
+  const dir = process.env.SHOTS;
+  if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
+}
+
 async function clickCanvas(page: Page, at: [number, number]) {
   const box = (await page.getByTestId('canvas').boundingBox())!;
   await page.mouse.click(box.x + at[0], box.y + at[1]);
@@ -85,4 +91,56 @@ test('text: Escape cancels, mixed Urdu and English shapes without missing glyphs
   await page.getByTestId('text-input').press('Escape');
   await expect(page.getByTestId('text-input')).toHaveCount(0);
   await expect(page.getByTestId('vector-count')).toHaveText('0 vectors');
+});
+
+test('T6.8: text on a curve stays on it when edited, and V-carves', async ({ page }) => {
+  await page.goto('./');
+  const box = (await page.getByTestId('canvas').boundingBox())!;
+  const at = (x: number, y: number) => [box.x + x, box.y + y] as const;
+  // The curve: a circle, left selected after drawing.
+  await page.getByTestId('tool-ellipse').click();
+  await page.mouse.move(...at(300, 250));
+  await page.mouse.down();
+  await page.mouse.move(...at(500, 450), { steps: 6 });
+  await page.mouse.up();
+  const num = async (id: string) => Number(await page.getByTestId(id).inputValue());
+  const circle = {
+    x: await num('sel-x'),
+    y: await num('sel-y'),
+    w: await num('sel-w'),
+    h: await num('sel-h'),
+  };
+
+  await page.getByTestId('tool-text').click();
+  await clickCanvas(page, [600, 600]);
+  await page.getByTestId('text-size').fill('8');
+  await page.getByTestId('text-size').press('Enter');
+  await page.getByTestId('text-input').fill('NAQSH CARVING');
+  await page.getByTestId('text-path-on').click();
+  await page.getByTestId('text-path-flip').click();
+  await page.getByTestId('text-path-offset').fill('2');
+  await page.getByTestId('text-path-offset').press('Enter');
+  await expect(page.getByTestId('text-add')).toBeEnabled({ timeout: 15_000 });
+  await page.getByTestId('text-add').click();
+  await expect(page.getByTestId('vector-count')).toHaveText('2 vectors');
+  await shot(page, 'text-on-curve');
+  // Flipped to the outside and centred where it reads level: across the top of the circle.
+  const textCentre = (await num('sel-x')) + (await num('sel-w')) / 2;
+  expect(Math.abs(textCentre - (circle.x + circle.w / 2))).toBeLessThan(1);
+  expect(await num('sel-y')).toBeGreaterThan(circle.y + circle.h / 2);
+
+  // Edit: the curve settings come back; new words stay on the curve.
+  await page.getByTestId('edit-text').click();
+  await expect(page.getByTestId('text-path-offset')).toHaveValue('2');
+  await page.getByTestId('text-input').fill('NAQSH');
+  await expect(page.getByTestId('text-add')).toHaveText('Update text');
+  await page.getByTestId('text-add').click();
+  await expect(page.getByTestId('vector-count')).toHaveText('2 vectors');
+
+  await page.getByTestId('tab-cam').click();
+  await page.getByTestId('add-tool').selectOption({ label: '60° V-bit, 1/2"' });
+  await page.getByTestId('new-vcarve').click();
+  await expect(page.getByTestId('tp-estimate')).toContainText('Estimated time', {
+    timeout: 30_000,
+  });
 });

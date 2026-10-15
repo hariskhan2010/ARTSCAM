@@ -11,6 +11,20 @@
 
 The text becomes one closed shape, ready for V-carving or a relief.
 
+## Text on a curve
+
+Select the curve (any shape: an arc, a circle, a pen path) before you click with the Text tool. In
+the text card press **Put on the selected curve**:
+
+- The letters follow the curve. **Place along the curve** puts them at the start, middle or end of
+  an open curve; on a closed shape (a circle, an oval) they are centred where they read level.
+- **Distance from curve** lifts the baseline off the curve.
+- **Flip** runs the text the other way, on the other side: for a circle, flipped text sits outside
+  across the top, unflipped text inside along the bottom.
+- **Back to a straight line** undoes it.
+
+Text on a curve stays editable like any other text.
+
 ## Changing text later
 
 Select the text and press **Edit text** in the Selected shape panel. Change the wording, font,

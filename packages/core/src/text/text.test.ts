@@ -3,7 +3,9 @@ import { createRequire } from 'node:module';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { booleanOp, normalize, regionArea } from '../vector/clip';
 import { signedArea } from '../vector/flatten';
+import { arcThrough } from '../vector/edit';
 import { bbox } from '../vector/path';
+import { ellipse, line } from '../vector/shapes';
 import { layoutText, loadFont, regionToSegments, shapeLine, type LoadedFont } from './text';
 import { FontFormatError, sniffFont, toSfnt } from './woff';
 
@@ -166,3 +168,79 @@ describe('text layout (T3.2)', () => {
     expect(segs.filter((s) => s.type === 'close')).toHaveLength(region.length);
   });
 });
+
+describe('text on a curve (T6.8)', () => {
+  const circle = (r: number) => ellipse(0, 0, r);
+
+  it('on a straight path it matches straight text placed at the start of the path', () => {
+    const path = { segments: line([0, 0], [500, 0]), closed: false, offset: 0 };
+    const onPath = layoutText('Naqsh', { size: 20, fonts: [naskhLatin], align: 'left', path });
+    const straight = layoutText('Naqsh', { size: 20, fonts: [naskhLatin], align: 'left' });
+    const a = bbox(regionToSegments(onPath.region))!;
+    const b = bbox(regionToSegments(straight.region))!;
+    for (const k of ['minX', 'minY', 'maxX', 'maxY'] as const) expect(a[k]).toBeCloseTo(b[k], 2);
+    expect(regionArea(onPath.region)).toBeCloseTo(regionArea(straight.region), 0);
+  });
+
+  it('a counter-clockwise circle puts the text inside it; flip puts it outside', () => {
+    const R = 60;
+    const ring = (flip: boolean) =>
+      layoutText('WELCOME', {
+        size: 12,
+        fonts: [naskhLatin],
+        align: 'center',
+        path: { segments: circle(R), closed: true, offset: 2, flip },
+      }).region.flatMap((r) => r.map((p) => Math.hypot(p[0], p[1])));
+    const inside = ring(false);
+    expect(Math.max(...inside)).toBeLessThan(R - 2 + 4);
+    expect(Math.min(...inside)).toBeGreaterThan(R - 2 - 12);
+    // Inside, text reads level along the bottom.
+    const insideYs = layoutText('WELCOME', {
+      size: 12,
+      fonts: [naskhLatin],
+      align: 'center',
+      path: { segments: circle(R), closed: true, offset: 2 },
+    }).region.flatMap((r) => r.map((p) => p[1]));
+    expect(Math.max(...insideYs)).toBeLessThan(0);
+  });
+
+  it('around a circle (flipped) the letters sit outside it, centred across the top where they read level', () => {
+    const R = 60;
+    const offset = 2;
+    const { region } = layoutText('WELCOME', {
+      size: 12,
+      fonts: [naskhLatin],
+      align: 'center',
+      path: { segments: circle(R), closed: true, offset, flip: true },
+    });
+    // Every outline point lies in the ring from the baseline (R + offset, minus descenders) to the cap height.
+    for (const ring of region)
+      for (const [x, y] of ring) {
+        const d = Math.hypot(x, y);
+        expect(d).toBeGreaterThan(R + offset - 4);
+        expect(d).toBeLessThan(R + offset + 12);
+      }
+    // Read clockwise outside the circle, text is level at the top: centred there.
+    const xs = region.flatMap((r) => r.map((p) => p[0]));
+    expect(Math.min(...xs)).toBeLessThan(0);
+    expect(Math.max(...xs)).toBeGreaterThan(0);
+    expect(Math.abs(Math.min(...xs) + Math.max(...xs))).toBeLessThan(2); // symmetric
+    expect(Math.min(...region.flatMap((r) => r.map((p) => p[1])))).toBeGreaterThan(0);
+  });
+
+  it('Urdu follows the curve too, without missing glyphs', () => {
+    const { region, missing } = layoutText('خوش آمدید', {
+      size: 20,
+      fonts: [nastaliq],
+      align: 'center',
+      path: { segments: arcPath(), closed: false, offset: 0 },
+    });
+    expect(missing).toEqual([]);
+    expect(regionArea(region)).toBeGreaterThan(50);
+  });
+});
+
+/** An upward arc 200 mm wide, for the Urdu test. */
+function arcPath() {
+  return arcThrough([-100, 0], [0, 40], [100, 0]);
+}

@@ -12,13 +12,13 @@ panel and calligraphy work), **P2** later, **P3** niche. Effort: S (days), M (1�
 
 | Area | Have | Partial | Missing |
 |---|---|---|---|
-| Vector and text tools | 14 | 2 | 12 |
+| Vector and text tools | 15 | 2 | 11 |
 | Bitmap tools | 1 | 0 | 3 |
 | Relief (3D design) tools | 11 | 4 | 21 |
 | 2D toolpaths | 7 | 2 | 17 |
 | 3D toolpaths | 4 | 1 | 11 |
 | Simulation, files, machines | 3 | 2 | 6 |
-| **Total** | **40** | **11** | **70** |
+| **Total** | **41** | **11** | **69** |
 
 Counts are table rows; one row can group several related tools.
 
@@ -46,7 +46,7 @@ on a curve**, **vector arcs, fillets and arrays**, **bitmap tracing**, **more fi
 | Block copy / array (grid and circular) | ✅ | T6.7 | | |
 | Align and distribute | ✅ | T6.7 | | |
 | Join / close open vectors, "vector doctor" (fix gaps, overlaps, duplicates) | ✅ | Join + Repair (T6.7); overlapping shapes are not detected yet | | |
-| Text on a curve | ❌ | Very common on plaques and mosque panels | P1 | M |
+| Text on a curve | ✅ | T6.8: start/middle/end, level on closed shapes, offset, flip; editable | | |
 | Single-stroke (engraving) fonts | ❌ | For engraving and V-carved small text | P2 | M |
 | Guide lines | ❌ | | P2 | S |
 | Measure tool (distance, angle) | ❌ | | P2 | S |

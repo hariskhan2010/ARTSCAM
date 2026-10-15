@@ -1,7 +1,7 @@
 import type { Segment } from '../model/schema';
 import { normalize, type Region } from '../vector/clip';
 import { flatten } from '../vector/flatten';
-import type { Vec2 } from '../vector/path';
+import { length, pointAt, transformSegments, type Matrix, type Vec2 } from '../vector/path';
 import { toSfnt } from './woff';
 
 /**
@@ -68,6 +68,22 @@ export interface TextOptions {
   letterSpacing?: number;
   /** Max deviation (mm) when flattening glyph curves. Default 0.01. */
   tolerance?: number;
+  /**
+   * Lay the text along this path instead of a straight baseline (T6.8). The
+   * text becomes one line; `align` places it at the start, middle or end of
+   * the path, and each glyph is turned to follow it, `offset` mm to its left
+   * (above a left-to-right path).
+   */
+  path?: TextPath;
+}
+
+export interface TextPath {
+  segments: Segment[];
+  closed: boolean;
+  /** Distance of the baseline from the path, mm (positive: to the left of its direction). */
+  offset: number;
+  /** Run the text the other way along the path (and onto its other side). Default false. */
+  flip?: boolean | undefined;
 }
 
 export interface TextLayout {
@@ -290,6 +306,23 @@ export function layoutText(text: string, options: TextOptions): TextLayout {
   const rings: Vec2[][] = [];
   const lineWidths: number[] = [];
 
+  if (options.path) {
+    const shaped = shapeLine(
+      text.replace(/\s*[\r\n]+\s*/g, ' '),
+      fonts,
+      options.size,
+      options.letterSpacing ?? 0,
+      missing,
+    );
+    lineWidths.push(shaped.width);
+    for (const segs of glyphsOnPath(shaped, options.size, options.path, options.align ?? 'left')) {
+      for (const poly of flatten(segs, tolerance, true)) {
+        if (poly.points.length >= 3) rings.push(poly.points);
+      }
+    }
+    return { region: normalize(rings, 'nonZero'), missing: [...missing], lineWidths, lineHeight };
+  }
+
   text
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -314,6 +347,78 @@ export function layoutText(text: string, options: TextOptions): TextLayout {
     });
 
   return { region: normalize(rings, 'nonZero'), missing: [...missing], lineWidths, lineHeight };
+}
+
+/**
+ * Glyph outlines placed along a path: each glyph's centre (along the line)
+ * goes to its distance along the path, turned to the path's direction there.
+ * Past the end of an open path the glyphs continue in a straight line; a
+ * closed path wraps around.
+ */
+function glyphsOnPath(
+  shaped: ShapedLine,
+  size: number,
+  path: TextPath,
+  align: TextAlign,
+): Segment[][] {
+  const L = length(path.segments, path.closed);
+  // Open paths: align to their start, middle or end. Closed paths have no ends:
+  // align to the point where the text reads level (heading most to the right).
+  let anchor = align === 'left' ? 0 : align === 'center' ? L / 2 : L;
+  if (path.closed && L > 0) {
+    let best = -Infinity;
+    for (let k = 0; k < 720; k++) {
+      const s = (k / 720) * L;
+      const p = pointAt(path.segments, path.flip ? L - s : s, true);
+      const heading = p ? (path.flip ? -p.tangent[0] : p.tangent[0]) : -Infinity;
+      if (heading > best + 1e-9) {
+        best = heading;
+        anchor = s;
+      }
+    }
+  }
+  const start =
+    align === 'left'
+      ? path.closed
+        ? anchor
+        : 0
+      : align === 'center'
+        ? anchor - shaped.width / 2
+        : anchor - shaped.width;
+  const at = (along: number) => {
+    // Flipped: the same path walked backwards.
+    let s = path.flip ? L - along : along;
+    if (path.closed && L > 0) s = ((s % L) + L) % L;
+    const clamped = Math.min(L, Math.max(0, s));
+    const p = pointAt(path.segments, clamped, path.closed);
+    if (!p) return undefined;
+    // Beyond an open path's ends, carry on along the end tangent.
+    const over = s - clamped;
+    return {
+      point: [p.point[0] + p.tangent[0] * over, p.point[1] + p.tangent[1] * over] as Vec2,
+      tangent: (path.flip ? [-p.tangent[0], -p.tangent[1]] : p.tangent) as Vec2,
+    };
+  };
+  const gs = shaped.glyphs;
+  return gs.flatMap((g, i) => {
+    const next = gs[i + 1];
+    const advance = Math.max(0, (next ? next.x : shaped.width) - g.x);
+    const mid = g.x + advance / 2;
+    const p = at(start + mid);
+    if (!p) return [];
+    const [tx, ty] = p.tangent;
+    // Glyph drawn with its centre at the origin, then turned and moved onto the path.
+    const local = glyphSegments(g.font, g.glyph, size / g.font.upem, g.x - mid, g.y);
+    const m: Matrix = [
+      tx,
+      ty,
+      -ty,
+      tx,
+      p.point[0] - ty * path.offset,
+      p.point[1] + tx * path.offset,
+    ];
+    return [transformSegments(local, m)];
+  });
 }
 
 /** Region rings as one closed vector's segments (outer rings and holes together). */

@@ -161,7 +161,7 @@ export function selectedText(store: EditorStore): Vector | undefined {
 export function editText(store: EditorStore) {
   const v = selectedText(store);
   if (!v?.text) return;
-  const { content, fontId, size, align, matrix } = v.text;
+  const { content, fontId, size, align, matrix, path } = v.text;
   store.setUi({
     tool: 'text',
     textDraft: {
@@ -172,6 +172,7 @@ export function editText(store: EditorStore) {
       align,
       matrix,
       editing: v.id,
+      ...(path && { path }),
     },
   });
 }

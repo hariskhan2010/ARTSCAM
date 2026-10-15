@@ -741,6 +741,8 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     if (tool === 'text') {
       const at = snapped(p);
       const draft = store.ui.textDraft;
+      // Text on a curve stays on its curve.
+      if (draft?.path) return;
       store.setUi({
         // Clicking again moves the text; an edited text keeps its rotation and scale.
         textDraft: draft

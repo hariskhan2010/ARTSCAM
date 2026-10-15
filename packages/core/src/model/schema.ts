@@ -53,6 +53,15 @@ export const textSourceSchema = z.strictObject({
   size: positive,
   align: z.enum(['left', 'center', 'right']),
   matrix: z.tuple([finite, finite, finite, finite, finite, finite]),
+  /** Text on a curve (T6.8): the curve as it was when the text was placed, before `matrix`. */
+  path: z
+    .strictObject({
+      segments: z.array(segmentSchema),
+      closed: z.boolean(),
+      offset: finite,
+      flip: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export const vectorSchema = z.strictObject({

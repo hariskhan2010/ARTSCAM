@@ -10,6 +10,7 @@ import {
   type Relief,
   type Segment,
   type TextAlign,
+  type TextPath,
   type Vector,
   type ReliefOp,
 } from '@naqsh/core';
@@ -49,6 +50,8 @@ export interface TextDraft {
   matrix?: Matrix;
   /** Id of the text vector being edited (Edit text); absent for new text. */
   editing?: string;
+  /** Text on a curve: the curve (world mm, before `matrix`), offset and side. */
+  path?: TextPath;
 }
 
 type FromVector = Extract<ReliefOp, { op: 'fromVector' }>;

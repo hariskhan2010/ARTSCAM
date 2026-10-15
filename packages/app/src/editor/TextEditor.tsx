@@ -1,5 +1,6 @@
 import {
   addVectors,
+  IDENTITY,
   layoutText,
   regionToSegments,
   setVectorText,
@@ -16,9 +17,12 @@ import { addUserFont, allFonts } from '../text/fonts';
 import { pickFile } from '../files';
 import type { EditorStore, TextDraft } from './store';
 
-/** Where the laid-out text goes: its saved placement, or a move to the click point. */
+/**
+ * Where the laid-out text goes: its saved placement; text on a curve is laid
+ * out in place; otherwise a move to the click point.
+ */
 function placement(draft: TextDraft): Matrix {
-  return draft.matrix ?? translation(draft.at[0], draft.at[1]);
+  return draft.matrix ?? (draft.path ? IDENTITY : translation(draft.at[0], draft.at[1]));
 }
 
 /**
@@ -51,6 +55,7 @@ export function TextEditor({ store }: { store: EditorStore }) {
           size: draft.size,
           fonts,
           align: draft.align,
+          ...(draft.path && { path: draft.path }),
         });
         store.setUi({
           textPreview: transformSegments(regionToSegments(region), placement(draft)),
@@ -67,6 +72,9 @@ export function TextEditor({ store }: { store: EditorStore }) {
   }, [draft]);
 
   if (!draft) return null;
+  // The one selected shape (not the text being edited) can carry the text.
+  const sel = store.ui.selection.filter((id) => id !== draft.editing);
+  const curve = sel.length === 1 ? store.doc.vectors.find((v) => v.id === sel[0]) : undefined;
   const set = (patch: Partial<typeof draft>) => store.setUi({ textDraft: { ...draft, ...patch } });
   const cancel = () => store.setUi({ textDraft: undefined, textPreview: undefined });
   const add = () => {
@@ -78,6 +86,7 @@ export function TextEditor({ store }: { store: EditorStore }) {
       size: draft.size,
       align: draft.align,
       matrix: [...placement(draft)],
+      ...(draft.path && { path: draft.path }),
     };
     if (draft.editing) {
       store.execute(setVectorText(draft.editing, text, segments));
@@ -140,7 +149,7 @@ export function TextEditor({ store }: { store: EditorStore }) {
         />
       </div>
       <Segmented<TextAlign>
-        label="Align to the click point"
+        label={draft.path ? 'Place along the curve' : 'Align to the click point'}
         value={draft.align}
         options={[
           { value: 'left', label: 'Left', icon: TextAlignStart },
@@ -149,6 +158,58 @@ export function TextEditor({ store }: { store: EditorStore }) {
         ]}
         onChange={(align) => set({ align })}
       />
+      {draft.path ? (
+        <>
+          <div className="row">
+            <NumberField
+              label="Distance from curve"
+              units={store.doc.units}
+              value={draft.path.offset}
+              testId="text-path-offset"
+              help="How far the baseline sits from the curve"
+              onCommit={(offset) => draft.path && set({ path: { ...draft.path, offset } })}
+            />
+            <Btn
+              label="Flip"
+              onClick={() => draft.path && set({ path: { ...draft.path, flip: !draft.path.flip } })}
+              testId="text-path-flip"
+              title="Run the text the other way, on the other side of the curve"
+            />
+          </div>
+          <Btn
+            label="Back to a straight line"
+            variant="ghost"
+            onClick={() => {
+              const straight: TextDraft = {
+                at: draft.at,
+                text: draft.text,
+                fontId: draft.fontId,
+                size: draft.size,
+                align: draft.align,
+                ...(draft.editing && { editing: draft.editing }),
+              };
+              store.setUi({ textDraft: straight });
+            }}
+            testId="text-path-off"
+          />
+        </>
+      ) : (
+        <Btn
+          label="Put on the selected curve"
+          disabled={!curve}
+          onClick={() =>
+            curve &&
+            set({
+              path: { segments: curve.segments, closed: curve.closed, offset: 0 },
+              matrix: IDENTITY,
+            })
+          }
+          testId="text-path-on"
+          title={
+            curve ? 'Lay the text along the selected shape' : 'Select one shape (the curve) first'
+          }
+        />
+      )}
       {missing.length > 0 && (
         <Hint tone="warn">This font has no glyph for: {missing.join(' ')}</Hint>
       )}
