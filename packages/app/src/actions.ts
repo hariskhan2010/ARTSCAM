@@ -14,6 +14,7 @@ import {
   loadProject,
   newProject,
   offset,
+  projectSchema,
   reliefToStl,
   rotation,
   saveProject,
@@ -31,6 +32,7 @@ import {
   type Vector,
 } from '@naqsh/core';
 import type { CamRunner } from './cam/runner';
+import { SAMPLES } from './samples';
 import { shownRelief, type EditorStore, type ReliefForm } from './editor/store';
 import { download, pickFile } from './files';
 
@@ -58,6 +60,23 @@ export async function openProject(store: EditorStore) {
     const { project, images } = loadProject(new Uint8Array(await file.arrayBuffer()));
     store.load(project, images);
     store.setUi({ message: `Opened ${file.name}` });
+  } catch (e) {
+    store.setUi({ message: (e as Error).message });
+  }
+}
+
+/** Opens a sample project (Help › Samples), after confirming unsaved work is dropped. */
+export function openSample(store: EditorStore, id: string) {
+  const sample = SAMPLES.find((s) => s.id === id);
+  if (!sample) return;
+  if (
+    store.doc.vectors.length > 0 &&
+    !window.confirm(`Open the sample "${sample.name}"? Unsaved changes are lost.`)
+  )
+    return;
+  try {
+    store.load(projectSchema.parse(sample.project));
+    store.setUi({ message: `Opened the sample "${sample.name}": ${sample.text}` });
   } catch (e) {
     store.setUi({ message: (e as Error).message });
   }

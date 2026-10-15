@@ -181,3 +181,17 @@ test('usable at 1366 × 551: everything in reach without page scroll', async ({ 
   await expect(page.getByTestId('sel-x')).toBeVisible();
   await shot(page, 'small-light');
 });
+
+test('Help › Samples opens a sample project ready to machine', async ({ page }) => {
+  await page.goto('./');
+  await page.getByTestId('menu-help').click();
+  await page.getByTestId('mi-help-sample-calligraphy-plaque').click();
+  await expect(page.getByTestId('message')).toContainText('Calligraphy plaque');
+  await expect(page.getByTestId('vector-count')).toHaveText('2 vectors');
+  const tree = page.getByRole('tree', { name: 'Project' });
+  await expect(tree).toContainText('V-carve text');
+  await tree.getByText('Cut out').click();
+  await expect(page.getByTestId('tp-estimate')).toContainText('Estimated time', {
+    timeout: 60_000,
+  });
+});

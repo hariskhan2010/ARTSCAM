@@ -1,0 +1,264 @@
+{
+  "format": "naqsh-project",
+  "version": "0.1",
+  "units": "mm",
+  "stock": {
+    "width": 200,
+    "height": 150,
+    "thickness": 20,
+    "origin": "bottom-left",
+    "zZero": "top"
+  },
+  "layers": [{ "id": "L1", "name": "Design", "visible": true, "locked": false }],
+  "vectors": [
+    {
+      "id": "frame",
+      "layer": "L1",
+      "closed": true,
+      "segments": [
+        { "type": "move", "p": [25, 15] },
+        { "type": "line", "p": [175, 15] },
+        {
+          "type": "cubic",
+          "c1": [180.52284749830793, 15],
+          "c2": [185, 19.477152501692068],
+          "p": [185, 25]
+        },
+        { "type": "line", "p": [185, 125] },
+        {
+          "type": "cubic",
+          "c1": [185, 130.52284749830793],
+          "c2": [180.52284749830793, 135],
+          "p": [175, 135]
+        },
+        { "type": "line", "p": [25, 135] },
+        {
+          "type": "cubic",
+          "c1": [19.477152501692068, 135],
+          "c2": [15.000000000000002, 130.52284749830793],
+          "p": [15, 125]
+        },
+        { "type": "line", "p": [15, 25] },
+        {
+          "type": "cubic",
+          "c1": [15, 19.477152501692068],
+          "c2": [19.477152501692064, 15.000000000000002],
+          "p": [24.999999999999996, 15]
+        },
+        { "type": "close" }
+      ]
+    },
+    {
+      "id": "border",
+      "layer": "L1",
+      "closed": false,
+      "segments": [
+        { "type": "move", "p": [0, 0] },
+        { "type": "line", "p": [3, 4] },
+        { "type": "line", "p": [6, 5] },
+        { "type": "line", "p": [9, 3] },
+        { "type": "line", "p": [11, 5] },
+        { "type": "line", "p": [14, 0] }
+      ]
+    },
+    {
+      "id": "petal",
+      "layer": "L1",
+      "closed": false,
+      "segments": [
+        { "type": "move", "p": [0, 0] },
+        { "type": "line", "p": [0.5, 6] },
+        { "type": "line", "p": [6, 7] },
+        { "type": "line", "p": [12, 4] },
+        { "type": "line", "p": [18, 5] },
+        { "type": "line", "p": [24, 3] },
+        { "type": "line", "p": [28, 0] }
+      ]
+    },
+    {
+      "id": "inner",
+      "layer": "L1",
+      "closed": true,
+      "segments": [
+        { "type": "move", "p": [38, 32] },
+        { "type": "line", "p": [162, 32] },
+        {
+          "type": "cubic",
+          "c1": [165.31370849898477, 32],
+          "c2": [168, 34.68629150101524],
+          "p": [168, 38]
+        },
+        { "type": "line", "p": [168, 112] },
+        {
+          "type": "cubic",
+          "c1": [168, 115.31370849898477],
+          "c2": [165.31370849898477, 118],
+          "p": [162, 118]
+        },
+        { "type": "line", "p": [38, 118] },
+        {
+          "type": "cubic",
+          "c1": [34.68629150101524, 118],
+          "c2": [32, 115.31370849898477],
+          "p": [32, 112]
+        },
+        { "type": "line", "p": [32, 38] },
+        {
+          "type": "cubic",
+          "c1": [32, 34.68629150101524],
+          "c2": [34.68629150101524, 32],
+          "p": [38, 32]
+        },
+        { "type": "close" }
+      ]
+    },
+    {
+      "id": "leafL",
+      "layer": "L1",
+      "closed": true,
+      "segments": [
+        { "type": "move", "p": [67, 75] },
+        {
+          "type": "cubic",
+          "c1": [67, 87.15026449627746],
+          "c2": [61.62741699796952, 97],
+          "p": [55, 97]
+        },
+        {
+          "type": "cubic",
+          "c1": [48.37258300203048, 97],
+          "c2": [43, 87.15026449627746],
+          "p": [43, 75]
+        },
+        {
+          "type": "cubic",
+          "c1": [43, 62.84973550372255],
+          "c2": [48.37258300203048, 53],
+          "p": [55, 53]
+        },
+        {
+          "type": "cubic",
+          "c1": [61.62741699796952, 53],
+          "c2": [67, 62.84973550372254],
+          "p": [67, 75]
+        },
+        { "type": "close" }
+      ]
+    },
+    {
+      "id": "leafR",
+      "layer": "L1",
+      "closed": true,
+      "segments": [
+        { "type": "move", "p": [157, 75] },
+        {
+          "type": "cubic",
+          "c1": [157, 87.15026449627746],
+          "c2": [151.62741699796953, 97],
+          "p": [145, 97]
+        },
+        {
+          "type": "cubic",
+          "c1": [138.37258300203047, 97],
+          "c2": [133, 87.15026449627746],
+          "p": [133, 75]
+        },
+        {
+          "type": "cubic",
+          "c1": [133, 62.84973550372255],
+          "c2": [138.37258300203047, 53],
+          "p": [145, 53]
+        },
+        {
+          "type": "cubic",
+          "c1": [151.6274169979695, 53],
+          "c2": [157, 62.84973550372254],
+          "p": [157, 75]
+        },
+        { "type": "close" }
+      ]
+    }
+  ],
+  "reliefs": [
+    {
+      "id": "r1",
+      "resolution": 0.5,
+      "cols": 400,
+      "rows": 300,
+      "data": "reliefs/r1.f32",
+      "ops": [
+        {
+          "op": "texture",
+          "pattern": "hammered",
+          "spacing": 6,
+          "height": 0.6,
+          "within": "inner",
+          "mode": "add"
+        },
+        { "op": "extrude", "rail": "frame", "section": "border", "mode": "mergeHigh" },
+        { "op": "spin", "section": "petal", "centre": [100, 75], "mode": "mergeHigh" },
+        {
+          "op": "fromVector",
+          "vector": "leafL",
+          "profile": "dome",
+          "height": 5,
+          "mode": "mergeHigh"
+        },
+        {
+          "op": "fromVector",
+          "vector": "leafR",
+          "profile": "dome",
+          "height": 5,
+          "mode": "mergeHigh"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "flat6",
+      "name": "6 mm flat end mill",
+      "type": "flat",
+      "diameter": 6,
+      "flutes": 2,
+      "stepDown": 3,
+      "stepOver": 2.4,
+      "feed": 1500,
+      "plunge": 400,
+      "rpm": 18000
+    },
+    {
+      "id": "ball3",
+      "name": "1/8\" ball nose",
+      "type": "ballnose",
+      "diameter": 3.175,
+      "flutes": 2,
+      "stepDown": 1,
+      "stepOver": 0.3,
+      "feed": 1200,
+      "plunge": 300,
+      "rpm": 18000
+    }
+  ],
+  "toolpaths": [
+    {
+      "id": "rough",
+      "name": "Rough",
+      "type": "rough3d",
+      "tool": "flat6",
+      "relief": "r1",
+      "vectors": [],
+      "params": { "allowance": 0.5 }
+    },
+    {
+      "id": "finish",
+      "name": "Finish",
+      "type": "finish3d",
+      "tool": "ball3",
+      "relief": "r1",
+      "vectors": [],
+      "params": { "pattern": "x", "stepOver": 0.4 }
+    }
+  ],
+  "machine": { "post": "grbl", "travel": [800, 800, 100], "maxFeed": 5000, "safeZ": 5 }
+}

@@ -92,12 +92,14 @@ import {
   addSpin,
   addTwoRail,
   addTexture,
+  openSample,
 } from '../actions';
 import type { CamRunner } from '../cam/runner';
 import type { EditorStore, SidebarTab, ToolName } from '../editor/store';
 import { zoomBy, zoomFit, zoomPrevious, zoomSelection } from '../editor/viewActions';
 import type { IconEntry, IconItem } from './IconBar';
 import type { MenuDef, MenuEntry } from './MenuBar';
+import { SAMPLES } from '../samples';
 
 /**
  * Every command of the menu bar, the two toolbar rows, the left tool strip
@@ -739,6 +741,12 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
     {
       title: 'Help',
       items: [
+        ...SAMPLES.map((s): MenuEntry => ({
+          label: `Sample: ${s.name}`,
+          title: s.text,
+          onClick: () => openSample(store, s.id),
+        })),
+        'separator',
         {
           label: 'Keyboard shortcuts',
           onClick: () =>
