@@ -38,6 +38,41 @@ test('M3: Urdu text with the Text tool, V-carved, simulated and exported', async
   await expect(page.getByTestId('message')).toContainText('checker passed');
 });
 
+test('text stays editable after it is added and moved; the edit undoes in one step', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByTestId('tool-text').click();
+  await clickCanvas(page, [400, 400]);
+  await page.getByTestId('text-size').fill('30');
+  await page.getByTestId('text-size').press('Enter');
+  await page.getByTestId('text-input').fill('AB');
+  await expect(page.getByTestId('text-add')).toBeEnabled({ timeout: 15_000 });
+  await page.getByTestId('text-add').click();
+  const width = async () => Number(await page.getByTestId('sel-w').inputValue());
+  const w1 = await width();
+  expect(w1).toBeGreaterThan(0);
+
+  // Move it, then edit: the card opens with the saved text and size.
+  await page.getByTestId('sel-y').fill('20');
+  await page.getByTestId('sel-y').press('Enter');
+  await page.getByTestId('edit-text').click();
+  await expect(page.getByTestId('text-input')).toHaveValue('AB');
+  await expect(page.getByTestId('text-size')).toHaveValue('30');
+  await page.getByTestId('text-input').fill('ABCDEF');
+  await expect(page.getByTestId('text-add')).toHaveText('Update text');
+  await expect(page.getByTestId('text-add')).toBeEnabled({ timeout: 15_000 });
+  await page.getByTestId('text-add').click();
+
+  await expect(page.getByTestId('vector-count')).toHaveText('1 vectors');
+  await expect.poll(width).toBeGreaterThan(w1 * 2);
+  // Still where it was moved to.
+  expect(Number(await page.getByTestId('sel-y').inputValue())).toBeCloseTo(20, 0);
+
+  await page.keyboard.press('Control+z');
+  await expect.poll(width).toBeCloseTo(w1, 3);
+});
+
 test('text: Escape cancels, mixed Urdu and English shapes without missing glyphs', async ({
   page,
 }) => {

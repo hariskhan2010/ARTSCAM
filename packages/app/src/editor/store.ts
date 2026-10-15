@@ -4,6 +4,7 @@ import {
   newProject,
   type Command,
   type Grid,
+  type Matrix,
   type ProjectBundle,
   type Project,
   type Segment,
@@ -32,6 +33,10 @@ export interface TextDraft {
   /** Font size (em height) in mm. */
   size: number;
   align: TextAlign;
+  /** Placement of the laid-out text. Default: a move to `at`. */
+  matrix?: Matrix;
+  /** Id of the text vector being edited (Edit text); absent for new text. */
+  editing?: string;
 }
 
 type FromVector = Extract<ReliefOp, { op: 'fromVector' }>;

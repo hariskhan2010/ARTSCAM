@@ -121,6 +121,31 @@ export function selectedVectors(store: EditorStore): Vector[] {
     .filter((v): v is Vector => !!v);
 }
 
+/** The one selected vector, when it is editable text. */
+export function selectedText(store: EditorStore): Vector | undefined {
+  const sel = selectedVectors(store);
+  return sel.length === 1 && sel[0]?.text ? sel[0] : undefined;
+}
+
+/** Opens the text card on the selected text shape; "Update text" replaces it. */
+export function editText(store: EditorStore) {
+  const v = selectedText(store);
+  if (!v?.text) return;
+  const { content, fontId, size, align, matrix } = v.text;
+  store.setUi({
+    tool: 'text',
+    textDraft: {
+      at: [matrix[4], matrix[5]],
+      text: content,
+      fontId,
+      size,
+      align,
+      matrix,
+      editing: v.id,
+    },
+  });
+}
+
 export function copySelection(store: EditorStore): boolean {
   const sel = selectedVectors(store);
   if (sel.length === 0) {

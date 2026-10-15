@@ -32,13 +32,20 @@ import {
   RotateCcw,
   RotateCw,
   Trash,
+  Type,
   X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { selectionBBox } from '../editor/geometry';
 import type { EditorStore } from '../editor/store';
 import { Btn, Hint, NumberField, Section, SelectField } from './common';
-import { booleanSelection, offsetSelection, selectedVectors } from '../actions';
+import {
+  booleanSelection,
+  editText,
+  offsetSelection,
+  selectedText,
+  selectedVectors,
+} from '../actions';
 
 function SelectionSection({ store }: { store: EditorStore }) {
   const doc = store.doc;
@@ -78,6 +85,16 @@ function SelectionSection({ store }: { store: EditorStore }) {
       title={selected.length === 1 ? 'Selected shape' : `${selected.length} shapes selected`}
       icon={MousePointerClick}
     >
+      {selectedText(store) && (
+        <Btn
+          icon={Type}
+          label="Edit text"
+          wide
+          onClick={() => editText(store)}
+          testId="edit-text"
+          title="Change the wording, font, size or alignment of this text"
+        />
+      )}
       <div className="grid2">
         <NumberField
           label="Position X"

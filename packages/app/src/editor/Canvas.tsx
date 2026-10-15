@@ -689,8 +689,22 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       const at = snapped(p);
       const draft = store.ui.textDraft;
       store.setUi({
+        // Clicking again moves the text; an edited text keeps its rotation and scale.
         textDraft: draft
-          ? { ...draft, at }
+          ? {
+              ...draft,
+              at,
+              ...(draft.matrix && {
+                matrix: [
+                  draft.matrix[0],
+                  draft.matrix[1],
+                  draft.matrix[2],
+                  draft.matrix[3],
+                  at[0],
+                  at[1],
+                ] as const,
+              }),
+            }
           : {
               at,
               text: '',

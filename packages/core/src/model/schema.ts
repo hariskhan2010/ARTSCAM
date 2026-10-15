@@ -41,11 +41,26 @@ export const segmentSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('close') }),
 ]);
 
+/**
+ * Where a text vector came from, so it can be edited again. The outline in
+ * `segments` is the text laid out at the origin, then placed by `matrix`
+ * (the text tool's click point, plus any later move/rotate/scale). Edits that
+ * change the outline directly (node edits, offsets, booleans) drop it.
+ */
+export const textSourceSchema = z.strictObject({
+  content: z.string(),
+  fontId: z.string(),
+  size: positive,
+  align: z.enum(['left', 'center', 'right']),
+  matrix: z.tuple([finite, finite, finite, finite, finite, finite]),
+});
+
 export const vectorSchema = z.strictObject({
   id,
   layer: id,
   closed: z.boolean(),
   segments: z.array(segmentSchema),
+  text: textSourceSchema.optional(),
 });
 
 export const reliefProfileSchema = z.enum(['flat', 'dome', 'angle', 'round']);
@@ -325,6 +340,7 @@ export type Units = z.infer<typeof unitsSchema>;
 export type Stock = z.infer<typeof stockSchema>;
 export type Layer = z.infer<typeof layerSchema>;
 export type Segment = z.infer<typeof segmentSchema>;
+export type TextSource = z.infer<typeof textSourceSchema>;
 export type Vector = z.infer<typeof vectorSchema>;
 export type ReliefOp = z.infer<typeof reliefOpSchema>;
 export type Relief = z.infer<typeof reliefSchema>;

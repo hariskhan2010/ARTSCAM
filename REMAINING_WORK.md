@@ -17,7 +17,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **M5** 3D CAM: relief placed with its top at the top of the material; drop-cutter for flat, ball, V and tapered tools (fast row-skipping scan, same result as a full scan); raster finishing (X, Y, X then Y) with a ball nose; Z-level roughing with an allowance; both in the Toolpaths panel with simulation, time estimate and checked export. Both can be limited to closed boundary shapes (tool centre stays inside; finishing links lines along the surface inside a shape and lifts between shapes).
 - **Time estimate (T2.6) checked against grbl-sim:** all 10 golden files within ±10% (most within ±5%); a unit test keeps it there. First moves from an unknown start are now timed from the work origin.
 - **Sender check (T2.5):** all 10 golden files stream to grbl-sim with no error, pass GRBL's own `gvalidate`, and load in CNCjs's G-code loader (`gcode-toolpath`) with correct size and units.
-- Checks: `pnpm run ci` (lint, typecheck, 353 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
+- Checks: `pnpm run ci` (lint, typecheck, 356 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (21 browser tests on dev; 22 on the production build, including offline).
 
 ## Blocked: needs you
 
@@ -30,7 +30,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 
 ## Known gaps in finished milestones
 
-- **Text** becomes a shape when added, so it can't be edited afterwards (delete and retype). Bidi is simplified (fine for signs). WOFF2 fonts aren't supported. There is no text on a curve (P2).
+- **Text** stays editable (Selection › Edit text) after moving, rotating or scaling; node edits, offsets and booleans turn it into a plain shape. Bidi is simplified (fine for signs). WOFF2 fonts aren't supported. There is no text on a curve (P2).
 - **V-carve:** flat bottoms are cut with the V-bit itself; there is no separate flat clearing tool. A 70 mm word takes about 18 min. It could be faster with a true medial-axis path or fewer depth passes.
 - **Other §4 gaps:** trace bitmap, mirror/array/nesting (P2).
 - The dev server is started by hand with `pnpm dev`.

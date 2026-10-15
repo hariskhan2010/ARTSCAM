@@ -2,16 +2,24 @@ import {
   addVectors,
   layoutText,
   regionToSegments,
+  setVectorText,
   transformSegments,
   translation,
+  type Matrix,
   type TextAlign,
+  type TextSource,
 } from '@naqsh/core';
 import { Check, TextAlignCenter, TextAlignEnd, TextAlignStart, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Btn, Hint, NumberField, Segmented, SelectField } from '../panels/common';
 import { addUserFont, allFonts } from '../text/fonts';
 import { pickFile } from '../files';
-import type { EditorStore } from './store';
+import type { EditorStore, TextDraft } from './store';
+
+/** Where the laid-out text goes: its saved placement, or a move to the click point. */
+function placement(draft: TextDraft): Matrix {
+  return draft.matrix ?? translation(draft.at[0], draft.at[1]);
+}
 
 /**
  * Card for typing text with the Text tool. The text is shaped (HarfBuzz) as
@@ -45,10 +53,7 @@ export function TextEditor({ store }: { store: EditorStore }) {
           align: draft.align,
         });
         store.setUi({
-          textPreview: transformSegments(
-            regionToSegments(region),
-            translation(draft.at[0], draft.at[1]),
-          ),
+          textPreview: transformSegments(regionToSegments(region), placement(draft)),
         });
         setMissing(miss);
         setError(undefined);
@@ -67,12 +72,23 @@ export function TextEditor({ store }: { store: EditorStore }) {
   const add = () => {
     const segments = store.ui.textPreview;
     if (!segments?.length) return;
-    store.execute(
-      addVectors([{ layer: store.ui.activeLayer, closed: true, segments }], 'Add text'),
-    );
-    const last = store.doc.vectors.at(-1);
+    const text: TextSource = {
+      content: draft.text,
+      fontId: draft.fontId,
+      size: draft.size,
+      align: draft.align,
+      matrix: [...placement(draft)],
+    };
+    if (draft.editing) {
+      store.execute(setVectorText(draft.editing, text, segments));
+    } else {
+      store.execute(
+        addVectors([{ layer: store.ui.activeLayer, closed: true, segments, text }], 'Add text'),
+      );
+    }
+    const id = draft.editing ?? store.doc.vectors.at(-1)?.id;
     store.setUi({ textDraft: undefined, textPreview: undefined, tool: 'select' });
-    if (last) store.select([last.id]);
+    if (id) store.select([id]);
   };
 
   const loadFontFile = async () => {
@@ -140,12 +156,16 @@ export function TextEditor({ store }: { store: EditorStore }) {
       <div className="row">
         <Btn
           icon={Check}
-          label="Add text"
+          label={draft.editing ? 'Update text' : 'Add text'}
           variant="primary"
           disabled={!store.ui.textPreview?.length}
           onClick={add}
           testId="text-add"
-          title="Add the text as a shape (Ctrl+Enter)"
+          title={
+            draft.editing
+              ? 'Replace the shape with the edited text (Ctrl+Enter)'
+              : 'Add the text as a shape (Ctrl+Enter)'
+          }
         />
         <Btn icon={X} label="Cancel" variant="ghost" onClick={cancel} testId="text-cancel" />
       </div>

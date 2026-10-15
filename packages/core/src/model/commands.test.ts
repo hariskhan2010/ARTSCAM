@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rectangle } from '../vector/shapes';
-import { bbox, translation } from '../vector/path';
+import { bbox, rotation, translation } from '../vector/path';
 import {
   addLayer,
   addTool,
@@ -13,6 +13,7 @@ import {
   newProject,
   nextId,
   setVectorSegments,
+  setVectorText,
   transformVectors,
   updateLayer,
 } from './commands';
@@ -98,5 +99,69 @@ describe('document commands', () => {
     );
     p = setVectorSegments('v1', rectangle(0, 0, 2, 2)).apply(p);
     expect(bbox(p.vectors[0]!.segments)!.maxX).toBe(2);
+  });
+});
+
+describe('editable text', () => {
+  const text = { content: 'Naqsh', fontId: 'naskh', size: 20, align: 'left' as const };
+
+  it('a text vector keeps its source; moving it updates the placement', () => {
+    let p = addVectors([
+      {
+        layer: 'L1',
+        closed: true,
+        segments: rectangle(0, 0, 1, 1),
+        text: { ...text, matrix: [1, 0, 0, 1, 5, 5] },
+      },
+    ]).apply(newProject());
+    valid(p);
+    p = transformVectors(['v1'], translation(10, 0)).apply(p);
+    expect(p.vectors[0]!.text!.matrix).toEqual([1, 0, 0, 1, 15, 5]);
+    p = transformVectors(['v1'], rotation(Math.PI / 2)).apply(p);
+    const m = p.vectors[0]!.text!.matrix;
+    expect(m[4]).toBeCloseTo(-5, 9);
+    expect(m[5]).toBeCloseTo(15, 9);
+    valid(p);
+  });
+
+  it('node edits turn text into a plain shape; duplicates stay editable', () => {
+    let p = addVectors([
+      {
+        layer: 'L1',
+        closed: true,
+        segments: rectangle(0, 0, 1, 1),
+        text: { ...text, matrix: [1, 0, 0, 1, 0, 0] },
+      },
+    ]).apply(newProject());
+    p = duplicateVectors(['v1'], translation(3, 0)).apply(p);
+    expect(p.vectors[1]!.text!.matrix).toEqual([1, 0, 0, 1, 3, 0]);
+    p = setVectorSegments('v1', rectangle(0, 0, 2, 2)).apply(p);
+    expect(p.vectors[0]!.text).toBeUndefined();
+    valid(p);
+  });
+
+  it('setVectorText replaces the outline and the source in one undoable step', () => {
+    const h = new History(
+      addVectors([
+        {
+          layer: 'L1',
+          closed: true,
+          segments: rectangle(0, 0, 1, 1),
+          text: { ...text, matrix: [1, 0, 0, 1, 0, 0] },
+        },
+      ]).apply(newProject()),
+    );
+    h.execute(
+      setVectorText(
+        'v1',
+        { ...text, content: 'Edited', matrix: [1, 0, 0, 1, 0, 0] },
+        rectangle(0, 0, 4, 1),
+      ),
+    );
+    expect(h.doc.vectors[0]!.text!.content).toBe('Edited');
+    expect(bbox(h.doc.vectors[0]!.segments)!.maxX).toBe(4);
+    h.undo();
+    expect(h.doc.vectors[0]!.text!.content).toBe('Naqsh');
+    expect(bbox(h.doc.vectors[0]!.segments)!.maxX).toBe(1);
   });
 });

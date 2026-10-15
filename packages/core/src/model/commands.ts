@@ -1,4 +1,4 @@
-import { transformSegments, type Matrix } from '../vector/path';
+import { multiply, transformSegments, type Matrix } from '../vector/path';
 import type { Command } from './history';
 import {
   PROJECT_FORMAT,
@@ -9,6 +9,7 @@ import {
   type ReliefOp,
   type Segment,
   type Stock,
+  type TextSource,
   type Tool,
   type Toolpath,
   type Units,
@@ -120,9 +121,33 @@ export function transformVectors(
         return p;
       return {
         ...p,
-        vectors: p.vectors.map((v) =>
-          set.has(v.id) ? { ...v, segments: transformSegments(v.segments, m) } : v,
-        ),
+        vectors: p.vectors.map((v) => (set.has(v.id) ? transformVector(v, m) : v)),
+      };
+    },
+  };
+}
+
+/** A vector moved by `m`; a text vector's placement follows. */
+function transformVector<V extends Omit<Vector, 'id'>>(v: V, m: Matrix): V {
+  const segments = transformSegments(v.segments, m);
+  return v.text
+    ? { ...v, segments, text: { ...v.text, matrix: [...multiply(m, v.text.matrix)] } }
+    : { ...v, segments };
+}
+
+/** Replaces a text vector's source and outline (the outline laid out by the app). */
+export function setVectorText(
+  id: string,
+  text: TextSource,
+  segments: readonly Segment[],
+): ProjectCommand {
+  return {
+    label: 'Edit text',
+    apply: (p) => {
+      if (!p.vectors.some((x) => x.id === id)) return p;
+      return {
+        ...p,
+        vectors: p.vectors.map((x) => (x.id === id ? { ...x, segments: [...segments], text } : x)),
       };
     },
   };
@@ -142,8 +167,11 @@ export function setVectorSegments(
       if (!v) return p;
       return {
         ...p,
+        // The outline no longer comes from the text, so it becomes a plain shape.
         vectors: p.vectors.map((x) =>
-          x.id === id ? { ...x, segments: [...segments], closed: closed ?? x.closed } : x,
+          x.id === id
+            ? { id: x.id, layer: x.layer, closed: closed ?? x.closed, segments: [...segments] }
+            : x,
         ),
       };
     },
@@ -158,11 +186,15 @@ export function duplicateVectors(ids: readonly string[], m?: Matrix): ProjectCom
       const src = p.vectors.filter((v) => ids.includes(v.id));
       if (src.length === 0) return p;
       return addVectors(
-        src.map((v) => ({
-          layer: v.layer,
-          closed: v.closed,
-          segments: m ? transformSegments(v.segments, m) : v.segments,
-        })),
+        src.map((v) => {
+          const copy: NewVector = {
+            layer: v.layer,
+            closed: v.closed,
+            segments: v.segments,
+            ...(v.text && { text: v.text }),
+          };
+          return m ? transformVector(copy, m) : copy;
+        }),
         'Duplicate',
       ).apply(p);
     },
