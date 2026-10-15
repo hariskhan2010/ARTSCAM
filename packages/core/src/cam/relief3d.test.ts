@@ -7,10 +7,10 @@ import {
   newProject,
   setReliefOp,
 } from '../model/commands';
-import { projectSchema, type Project } from '../model/schema';
+import { projectSchema, type Project, type Vector } from '../model/schema';
 import { evaluateRelief } from '../relief/relief';
 import { createHeightmap, simulate } from '../sim/heightmap';
-import { ellipse } from '../vector/shapes';
+import { ellipse, rectangle } from '../vector/shapes';
 import { exportToolpath } from './export';
 import { dropCutter, placeRelief } from './relief3d';
 import { heightAt, TOOL_PRESETS } from './tools';
@@ -154,6 +154,67 @@ describe('3D CAM (M5)', () => {
     // Material left is at most one step-down above the allowance almost everywhere.
     expect(s[Math.floor(s.length * 0.95)]!).toBeLessThan(0.5 + FLAT6.stepDown + 0.05);
   }, 120_000);
+
+  it.each([
+    ['finish', 10],
+    ['rough', 20],
+  ] as const)(
+    '%s with a boundary vector: the tool centre stays inside it while cutting',
+    (id, R) => {
+      const p = domeProject();
+      // Boundary: a circle of radius R at the dome's centre (30, 20).
+      p.vectors.push({ id: 'b', layer: 'L1', closed: true, segments: ellipse(30, 20, R) });
+      const tp = p.toolpaths.find((t) => t.id === id)!;
+      tp.vectors = ['b'];
+      const ex = exportToolpath(p, id, { simulated: true });
+      expect(ex.check.issues.filter((i) => i.severity === 'error')).toEqual([]);
+      let cuts = 0;
+      for (const m of ex.check.program.moves) {
+        if (m.type === 'rapid') continue;
+        for (const q of [m.from, ...m.points]) {
+          const [x, y, z] = q;
+          if (x === null || y === null || z === null || z >= 0) continue;
+          cuts++;
+          expect(Math.hypot(x - 30, y - 20), `${id} cut at ${x}, ${y}`).toBeLessThanOrEqual(
+            R + 0.01,
+          );
+        }
+        // Straight cuts between two inside points stay inside (the circle is convex).
+      }
+      expect(cuts).toBeGreaterThan(50);
+      // Material beyond boundary + tool radius is untouched.
+      const hm = simulate(
+        createHeightmap(p.stock, { cell: 0.5 }),
+        ex.check.program,
+        ex.program.tool,
+      );
+      for (let r = 0; r < hm.rows; r++)
+        for (let c = 0; c < hm.cols; c++) {
+          const d = Math.hypot(hm.x0 + c * hm.cell - 30, hm.y0 + r * hm.cell - 20);
+          if (d > R + 3 + 0.5) expect(hm.z[r * hm.cols + c]!).toBeCloseTo(0, 6);
+        }
+    },
+    120_000,
+  );
+
+  it('finishing with a boundary links nearby lines along the surface and lifts across gaps', () => {
+    const p = domeProject();
+    // Two separate squares: the tool must lift to get from one to the other.
+    const sq = (x0: number): Vector['segments'] => rectangle(x0, 10, 10, 20);
+    p.vectors.push(
+      { id: 'a', layer: 'L1', closed: true, segments: sq(10) },
+      { id: 'b', layer: 'L1', closed: true, segments: sq(40) },
+    );
+    const tp = p.toolpaths.find((t) => t.id === 'finish')!;
+    tp.vectors = ['a', 'b'];
+    const ex = exportToolpath(p, 'finish', { simulated: true });
+    expect(ex.check.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    // One plunge per square (lines within a square are linked).
+    const plunges = ex.check.program.moves.filter(
+      (m) => m.type !== 'rapid' && m.from[2] !== null && m.from[2] > 0 && (m.to[2] ?? 0) <= 0,
+    );
+    expect(plunges.length).toBe(2);
+  });
 
   it('the checker enforces a ball-nose for finishing', () => {
     const p = domeProject();

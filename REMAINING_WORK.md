@@ -14,10 +14,10 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
 - Offline mode (PWA): installable; after one visit the whole app, including fonts and text shaping, works with no server. Tested by shutting the server down.
 - **M4** Relief engine: relief grid covering the material; shape → flat/dome/angle/round with base height; combine add/subtract/merge high/merge low/zero; smooth, scale, offset, invert; image → relief (placement, height, invert, blur), images stored in the project zip; watertight binary STL export; Relief panel, canvas shading and a Three.js 3D view.
-- **M5** 3D CAM: relief placed with its top at the top of the material; drop-cutter for flat, ball, V and tapered tools (fast row-skipping scan, same result as a full scan); raster finishing (X, Y, X then Y) with a ball nose; Z-level roughing with an allowance; both in the Toolpaths panel with simulation, time estimate and checked export.
+- **M5** 3D CAM: relief placed with its top at the top of the material; drop-cutter for flat, ball, V and tapered tools (fast row-skipping scan, same result as a full scan); raster finishing (X, Y, X then Y) with a ball nose; Z-level roughing with an allowance; both in the Toolpaths panel with simulation, time estimate and checked export. Both can be limited to closed boundary shapes (tool centre stays inside; finishing links lines along the surface inside a shape and lifts between shapes).
 - **Time estimate (T2.6) checked against grbl-sim:** all 10 golden files within ±10% (most within ±5%); a unit test keeps it there. First moves from an unknown start are now timed from the work origin.
 - **Sender check (T2.5):** all 10 golden files stream to grbl-sim with no error, pass GRBL's own `gvalidate`, and load in CNCjs's G-code loader (`gcode-toolpath`) with correct size and units.
-- Checks: `pnpm run ci` (lint, typecheck, 350 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
+- Checks: `pnpm run ci` (lint, typecheck, 353 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (20 browser tests on dev; 21 on the production build, including offline).
 
 ## Blocked: needs you
 
@@ -35,7 +35,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **Other §4 gaps:** trace bitmap, mirror/array/nesting (P2).
 - The dev server is started by hand with `pnpm dev`.
 - **Relief:** one relief per project in the UI (no back relief yet).
-- **3D CAM:** finishing and roughing cover the whole material (no boundary vector for finishing yet); no rest machining (P3). Finishing a 300 × 200 mm relief at 0.25 mm takes a few seconds per run.
+- **3D CAM:** no rest machining (P3). Finishing a 300 × 200 mm relief at 0.25 mm takes a few seconds per run.
 
 ## Next milestones (plan.md §10)
 

@@ -233,6 +233,24 @@ function ToolsSection({ store }: { store: EditorStore }) {
 function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
   const u: Units = store.doc.units;
   const save = (next: Toolpath) => store.execute(updateToolpath(next));
+  const boundary3d = (
+    <div className="row" style={{ alignItems: 'center' }}>
+      <Hint>
+        {tp.vectors.length
+          ? `Tool centre stays inside the ${tp.vectors.length} selected shape${tp.vectors.length === 1 ? '' : 's'}.`
+          : 'Covers the whole material. To limit it, select closed shapes and press Use selection.'}
+      </Hint>
+      {tp.vectors.length > 0 && (
+        <Btn
+          label="Whole material"
+          variant="ghost"
+          onClick={() => save({ ...tp, vectors: [] })}
+          title="Machine the whole material instead of the shapes"
+          testId="boundary-clear"
+        />
+      )}
+    </div>
+  );
   const depth = (
     <NumberField
       label="Cut depth"
@@ -441,12 +459,8 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
             help="Material left above the relief for the finishing pass"
             onCommit={(allowance) => save({ ...tp, params: { ...p, allowance } })}
           />
-          <Hint>
-            Uses the tool's depth per pass for each level.{' '}
-            {tp.vectors.length
-              ? `Limited to ${tp.vectors.length} shape(s).`
-              : 'Covers the whole material.'}
-          </Hint>
+          <Hint>Uses the tool's depth per pass for each level.</Hint>
+          {boundary3d}
         </>
       );
     }
@@ -472,6 +486,7 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
             help="Distance between passes; smaller is smoother but slower"
             onCommit={(stepOver) => save({ ...tp, params: { ...p, stepOver } })}
           />
+          {boundary3d}
         </>
       );
     }

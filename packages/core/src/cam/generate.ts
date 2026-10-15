@@ -82,10 +82,10 @@ export function generate(
       if (pr.maxH - gridRange(pr.grid.z).min > project.stock.thickness + 1e-9) {
         warnings.push('The relief is deeper than the material; the checker will block export');
       }
+      const boundary = vectors.length ? pocketRegion(vectors, tolerance, warnings) : undefined;
       if (tp.type === 'finish3d') {
-        emitFinish3d(b, pr, tool, tp.params, project.stock.width, project.stock.height);
+        emitFinish3d(b, pr, tool, tp.params, project.stock.width, project.stock.height, boundary);
       } else {
-        const boundary = vectors.length ? pocketRegion(vectors, tolerance, warnings) : undefined;
         emitRough3d(
           b,
           pr,

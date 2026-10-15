@@ -1,7 +1,7 @@
 import type { Tool, Toolpath } from '../model/schema';
 import { heightAt } from './tools';
 import type { Grid } from '../relief/relief';
-import { booleanOp, normalize, simplify, type Region } from '../vector/clip';
+import { booleanOp, clipLines, normalize, offset, simplify, type Region } from '../vector/clip';
 import type { Vec2 } from '../vector/path';
 import { PathBuilder } from './builder';
 import { emitPocketCentres } from './pocket';
@@ -38,6 +38,8 @@ type ToolShape = Pick<Tool, 'type' | 'diameter' | 'angle' | 'tipDiameter'>;
 
 /** A straight move may dip at most this far (mm) below the safe surface before it is split. */
 const REFINE_TOL = 0.005;
+/** A finishing link may run this far (mm) outside the boundary (it follows the edge). */
+const LINK_TOL = 0.005;
 
 /**
  * A drop-cutter for one tool: `at(x, y)` is the lowest safe tip Z at world XY.
@@ -151,6 +153,10 @@ function simplify3(pts: [number, number, number][], tol = 0.003): [number, numbe
  * Raster finishing: parallel lines, zig-zag, the tool following the
  * drop-cutter surface; links between lines also follow the surface, so the
  * whole pass is one continuous cut.
+ *
+ * With a boundary, the tool centre stays inside it: each line is clipped to
+ * the boundary, and a link follows the surface only when it stays inside too;
+ * otherwise the tool lifts and moves to the next piece.
  */
 export function emitFinish3d(
   b: PathBuilder,
@@ -159,6 +165,7 @@ export function emitFinish3d(
   params: Finish3dParams,
   width: number,
   height: number,
+  boundary?: Region,
 ): void {
   const drop = dropCutter(pr, tool);
   const step = params.stepOver ?? tool.stepOver;
@@ -182,31 +189,110 @@ export function emitFinish3d(
     refine(m, c, out, depth + 1);
   };
   const res = pr.grid.resolution;
-  const passes: ('x' | 'y')[] = params.pattern === 'xy' ? ['x', 'y'] : [params.pattern];
-  for (const dir of passes) {
-    const along = dir === 'x' ? width : height;
-    const across = dir === 'x' ? height : width;
-    const nLines = Math.max(1, Math.round(across / step));
-    const pts: [number, number, number][] = [];
-    for (let li = 0; li <= nLines; li++) {
-      const v = (li * across) / nLines;
-      const n = Math.max(1, Math.ceil(along / res));
-      const forward = li % 2 === 0;
-      for (let k = 0; k <= n; k++) {
-        const u = ((forward ? k : n - k) * along) / n;
-        const [x, y] = dir === 'x' ? [u, v] : [v, u];
-        const p: [number, number, number] = [x, y, drop.at(x, y)];
-        const prev = pts.at(-1);
-        if (prev && k > 0) refine(prev, p, pts, 0);
-        pts.push(p);
+  // Links may run exactly along the boundary edge; test them against the
+  // boundary grown by a hair so an edge counts as inside.
+  const linkRegion = boundary?.length
+    ? offset(boundary, LINK_TOL, { join: 'miter', fill: 'nonZero' })
+    : [];
+  /** True when the straight XY move a → c stays inside the boundary. */
+  const linkInside = (a: Vec2, c: Vec2) => {
+    const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    if (!boundary || len < 1e-9) return true;
+    const pieces = linkRegion.length ? clipLines([[a, c]], linkRegion) : [];
+    const inside = pieces.reduce((s, q) => {
+      for (let i = 1; i < q.length; i++) {
+        const p0 = q[i - 1] as Vec2;
+        const p1 = q[i] as Vec2;
+        s += Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
       }
-    }
+      return s;
+    }, 0);
+    return pieces.length === 1 && inside >= len - 1e-3;
+  };
+  const emitChain = (pts: [number, number, number][]) => {
+    if (pts.length === 0) return;
     const path = simplify3(pts);
     const first = path[0] as [number, number, number];
     b.travelTo([first[0], first[1]]);
     b.plungeTo(first[2]);
     for (const p of path) b.cutTo([p[0], p[1]], p[2]);
     b.retract();
+  };
+  const passes: ('x' | 'y')[] = params.pattern === 'xy' ? ['x', 'y'] : [params.pattern];
+  for (const dir of passes) {
+    const along = dir === 'x' ? width : height;
+    const across = dir === 'x' ? height : width;
+    const nLines = Math.max(1, Math.round(across / step));
+    const n = Math.max(1, Math.ceil(along / res));
+    const toXY = (u: number, v: number): Vec2 => (dir === 'x' ? [u, v] : [v, u]);
+    const vOf = (li: number) => (li * across) / nLines;
+    // Each line's pieces as [u0, u1] (u0 < u1) along it.
+    const lines: [number, number][][] = [];
+    for (let li = 0; li <= nLines; li++) {
+      const v = vOf(li);
+      if (!boundary) {
+        lines.push([[0, along]]);
+        continue;
+      }
+      const uOf = (p: Vec2) => (dir === 'x' ? p[0] : p[1]);
+      lines.push(
+        clipLines([[toXY(0, v), toXY(along, v)]], boundary)
+          .map((q): [number, number] => {
+            const us = q.map(uOf);
+            return [Math.max(0, Math.min(...us)), Math.min(along, Math.max(...us))];
+          })
+          .filter(([u0, u1]) => u1 - u0 > 1e-6)
+          .sort((s, t) => s[0] - t[0]),
+      );
+    }
+    const used = lines.map((l) => l.map(() => false));
+    /** Appends a piece from ua to ub on line li, following the surface. */
+    const addSpan = (pts: [number, number, number][], li: number, ua: number, ub: number) => {
+      // Samples on the same grid as an unclipped line, plus the piece's ends.
+      const lo = Math.min(ua, ub);
+      const hi = Math.max(ua, ub);
+      const ks: number[] = [];
+      for (let k = Math.ceil((lo * n) / along); k <= Math.floor((hi * n) / along); k++) {
+        const u = (k * along) / n;
+        if (u > lo + 1e-9 && u < hi - 1e-9) ks.push(u);
+      }
+      for (const u of [ua, ...(ua < ub ? ks : ks.reverse()), ub]) {
+        const [x, y] = toXY(u, vOf(li));
+        const p: [number, number, number] = [x, y, drop.at(x, y)];
+        const last = pts.at(-1);
+        if (last && last[0] === x && last[1] === y) continue;
+        if (last) refine(last, p, pts, 0);
+        pts.push(p);
+      }
+    };
+    // Zig-zag chains: from the end of a piece, continue on the next line with
+    // the nearest unused piece that can be reached without leaving the
+    // boundary; start a new chain (lift) when there is none.
+    for (;;) {
+      let li = used.findIndex((l) => l.includes(false));
+      if (li < 0) break;
+      let si = (used[li] as boolean[]).indexOf(false);
+      let [ua, ub] = (lines[li] as [number, number][])[si] as [number, number];
+      const pts: [number, number, number][] = [];
+      for (;;) {
+        (used[li] as boolean[])[si] = true;
+        addSpan(pts, li, ua, ub);
+        const end = toXY(ub, vOf(li));
+        const next = li + 1;
+        let best: [number, number, number] | undefined;
+        (lines[next] ?? []).forEach(([u0, u1], j) => {
+          if ((used[next] as boolean[])[j]) return;
+          const [s, e] = Math.abs(u0 - ub) <= Math.abs(u1 - ub) ? [u0, u1] : [u1, u0];
+          const d = Math.abs(s - ub);
+          if (best && d >= Math.abs(best[1] - ub)) return;
+          if (linkInside(end, toXY(s, vOf(next)))) best = [j, s, e];
+        });
+        if (!best) break;
+        li = next;
+        [si, ua, ub] = best;
+      }
+      emitChain(pts);
+    }
   }
 }
 
