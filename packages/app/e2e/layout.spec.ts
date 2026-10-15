@@ -54,11 +54,11 @@ test('menu bar: menus in order, items run actions, unbuilt items say "Coming lat
 
   // Not built yet: disabled, with the tooltip, and clicking does nothing.
   await page.getByTestId('menu-relief').click();
-  const spin = page.getByTestId('mi-relief-spin');
-  await expect(spin).toHaveAttribute('aria-disabled', 'true');
-  await expect(spin).toHaveAttribute('title', 'Coming later');
+  const turn = page.getByTestId('mi-relief-turn');
+  await expect(turn).toHaveAttribute('aria-disabled', 'true');
+  await expect(turn).toHaveAttribute('title', 'Coming later');
   await shot(page, 'menu-relief');
-  await spin.click({ force: true }); // aria-disabled: Playwright would wait for it to enable
+  await turn.click({ force: true }); // aria-disabled: Playwright would wait for it to enable
   await expect(page.getByRole('menu')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
@@ -100,7 +100,7 @@ test('project tree shows its panels; + buttons create things; status shows X Y Z
     'Sheets',
     'Toolpaths',
   ]);
-  await expect(page.getByTestId('tree-back-relief')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('tree-clipart')).toHaveAttribute('aria-disabled', 'true');
 
   // + on Vectors adds a layer, listed under it.
   await page.getByTestId('tree-add-layer').click();
@@ -114,6 +114,13 @@ test('project tree shows its panels; + buttons create things; status shows X Y Z
   await page.getByTestId('tree-add-relief').click();
   await expect(page.getByTestId('relief-stats')).toBeVisible();
   await expect(page.getByTestId('tree-add-relief')).toHaveCount(0);
+
+  // + on Back Relief creates a second, separate relief for the other face.
+  await page.getByTestId('tree-add-back-relief').click();
+  await expect(page.getByText('turn the material over left to right')).toBeVisible();
+  await expect(page.getByTestId('tree-add-back-relief')).toHaveCount(0);
+  await page.getByTestId('tab-relief').click();
+  await expect(page.getByText('turn the material over left to right')).toHaveCount(0);
 
   // Toolpath from the toolbar appears in the tree; picking it shows its settings.
   await page.getByTestId('tab-cam').click();

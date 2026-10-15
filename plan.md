@@ -281,6 +281,20 @@ Each task is one PR. Don't start a task until the previous one's acceptance chec
 | T5.3 Z-level roughing (offset pocketing per depth band, leaving an allowance) | No cut below the relief + allowance; material above it removed within step-over |
 | T5.4 3D toolpaths in the UI with simulation and checked export | Playwright: relief → rough + finish → simulate → export |
 
+**M6: sweeps, sculpting, textures** (Mach3/LinuxCNC posts already shipped)
+
+A cross-section is an open vector: its ends sit on the base, and its height
+at each point is measured from the straight line between its ends.
+
+| Task | Acceptance check |
+|---|---|
+| T6.1 Extrude: one cross-section swept along a rail (open or closed), optional end section blended along the rail | Straight rail gives the section's exact heights across it; length and ends correct; combine modes apply |
+| T6.2 Spin: a cross-section turned around a centre point | Heights depend only on the distance to the centre and match the section |
+| T6.3 Two-rail sweep: a cross-section stretched between two rails | Between parallel rails it equals an extrude; between diverging rails the section widens with them |
+| T6.4 Textures: repeating patterns (lines, dimples, hammered, weave) over the material or inside a shape, with spacing, height and angle | Pattern period, height and limits match the settings |
+| T6.5 Sculpt brushes: raise, lower, smooth strokes stored as relief ops (undoable, saved) | A stroke changes heights only within its radius, by the strength set; undo restores the grid |
+| T6.6 Sweeps, textures and sculpting in the Relief panel | Playwright: rebuild a small panel (border extrude, spun rosette, texture, sculpt touch-up) → 3D view → finish toolpath exports |
+
 ## 12. Evaluation
 
 | Metric | How |

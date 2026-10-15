@@ -87,6 +87,11 @@ import {
   smoothRelief,
   transformSelection,
   TOOLPATH_LABEL,
+  openReliefSide,
+  addExtrude,
+  addSpin,
+  addTwoRail,
+  addTexture,
 } from '../actions';
 import type { CamRunner } from '../cam/runner';
 import type { EditorStore, SidebarTab, ToolName } from '../editor/store';
@@ -397,7 +402,11 @@ export function toolStrip(store: EditorStore): IconEntry[] {
     title,
     kbd,
     pressed: t === id,
-    onClick: () => setTool(store, id),
+    onClick: () => {
+      setTool(store, id);
+      // The brush settings live in the Relief panel.
+      if (id === 'sculpt') store.setUi({ sidebarTab: 'relief' });
+    },
     testId: `tool-${id}`,
   });
   return [
@@ -426,7 +435,7 @@ export function toolStrip(store: EditorStore): IconEntry[] {
     { icon: ArcIcon, title: 'Arc', later: true, testId: 'tool-arc' },
     tool('text', Type, 'Text', 'T'),
     'sep',
-    { icon: Brush, title: 'Sculpt relief', later: true, testId: 'tool-sculpt' },
+    tool('sculpt', Brush, 'Sculpt relief', 'B'),
     { icon: MountainSnow, title: 'Relief clipart', later: true, testId: 'tool-clipart' },
   ];
 }
@@ -656,13 +665,22 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
         { label: '3D View', onClick: () => store.setUi({ show3d: true }) },
         { label: 'Export STL', disabled: !hasRelief, onClick: () => exportStl(store) },
         'separator',
-        later('Extrude along a rail'),
-        later('Spin'),
+        { label: 'Extrude along a rail', onClick: () => reliefStep(store, addExtrude) },
+        { label: 'Spin', onClick: () => reliefStep(store, addSpin) },
         later('Turn'),
-        later('Two-rail sweep'),
-        later('Sculpt'),
-        later('Texture'),
-        later('Back relief'),
+        { label: 'Two-rail sweep', onClick: () => reliefStep(store, addTwoRail) },
+        {
+          label: 'Sculpt',
+          onClick: () => {
+            store.setUi({ sidebarTab: 'relief' });
+            setTool(store, 'sculpt');
+          },
+        },
+        { label: 'Texture', onClick: () => reliefStep(store, addTexture) },
+        {
+          label: store.ui.reliefSide === 'back' ? 'Front relief' : 'Back relief',
+          onClick: () => openReliefSide(store, store.ui.reliefSide === 'back' ? 'front' : 'back'),
+        },
       ],
     },
     {

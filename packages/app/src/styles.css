@@ -244,6 +244,52 @@ h3 {
   box-shadow: var(--shadow);
 }
 
+.tool-hint {
+  top: 10px;
+  left: 10px;
+  max-width: min(520px, calc(100% - 20px));
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-hint .title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.tool-hint .keys {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.tool-hint .keys kbd {
+  font:
+    600 11px system-ui,
+    sans-serif;
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.tool-hint .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-hint .input {
+  width: 90px;
+}
+
 .text-editor {
   display: flex;
   flex-direction: column;

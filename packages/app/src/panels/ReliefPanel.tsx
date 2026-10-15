@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { EditorStore, ReliefForm } from '../editor/store';
 import {
+  activeRelief,
   addImageRelief,
   exportStl,
   invertRelief,
@@ -28,6 +29,7 @@ import {
   smoothRelief,
 } from '../actions';
 import { Btn, Hint, NumberField, Section, Segmented, SelectField } from './common';
+import { SculptSection, SweepSection, TextureSection } from './ReliefTools';
 
 type Profile = Extract<ReliefOp, { op: 'fromVector' }>['profile'];
 type Mode = Extract<ReliefOp, { op: 'fromVector' }>['mode'];
@@ -48,6 +50,24 @@ function describe(op: ReliefOp, vectors: Vector[]): string {
     }
     case 'fromImage':
       return `Image ${op.px}×${op.py} px · ${op.height} mm${op.invert ? ' · inverted' : ''} · ${op.mode}`;
+    case 'extrude': {
+      const n = (id: string) => vectors.findIndex((v) => v.id === id) + 1 || '?';
+      return `Extrude along shape ${n(op.rail)} · section ${n(op.section)}${op.endSection ? ` → ${n(op.endSection)}` : ''} · ${op.mode}`;
+    }
+    case 'spin': {
+      const n = vectors.findIndex((v) => v.id === op.section) + 1 || '?';
+      return `Spin section ${n} · ${op.mode}`;
+    }
+    case 'twoRail': {
+      const n = (id: string) => vectors.findIndex((v) => v.id === id) + 1 || '?';
+      return `Sweep between shapes ${n(op.railA)} and ${n(op.railB)} · section ${n(op.section)} · ${op.mode}`;
+    }
+    case 'texture': {
+      const n = op.within ? vectors.findIndex((v) => v.id === op.within) + 1 || '?' : undefined;
+      return `Texture ${op.pattern} ${op.spacing} mm · ${op.height} mm${n ? ` · in shape ${n}` : ''} · ${op.mode}`;
+    }
+    case 'sculpt':
+      return `Sculpt ${op.tool} · ${op.radius} mm brush${op.tool === 'smooth' ? '' : ` · ${op.strength} mm`}`;
     case 'smooth':
       return `Smooth ${op.radius} mm × ${op.passes}`;
     case 'scale':
@@ -62,7 +82,15 @@ function describe(op: ReliefOp, vectors: Vector[]): string {
 export function ReliefPanel({ store }: { store: EditorStore }) {
   const doc = store.doc;
   const u = doc.units;
-  const relief = doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? doc.reliefs[0];
+  const relief = activeRelief(store);
+  const back = store.ui.reliefSide === 'back';
+  const title = back ? 'Back relief' : 'Front relief';
+  const backHint = (
+    <Hint>
+      Designed as seen from the front, so it lines up with the front relief. Its toolpaths are
+      mirrored: turn the material over left to right before running them.
+    </Hint>
+  );
   const f = store.ui.reliefForm;
   const set = (patch: Partial<ReliefForm>) => setReliefForm(store, patch);
   const { resolution, profile, height, angle, mode, factor } = f;
@@ -70,7 +98,8 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
   if (!relief) {
     return (
       <div className="sidebar-scroll">
-        <Section title="Relief" icon={Mountain}>
+        <Section title={title} icon={Mountain}>
+          {back && backHint}
           <Hint>
             A relief is a carved 3D surface over the material. Create one, then build it from shapes
             (domes, slopes, rounded edges) and pictures.
@@ -87,11 +116,11 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
           />
           <Btn
             icon={Plus}
-            label="Create relief"
+            label={back ? 'Create back relief' : 'Create relief'}
             variant="primary"
             testId="relief-create"
             onClick={() => {
-              store.execute(addRelief(resolution));
+              store.execute(addRelief(resolution, undefined, store.ui.reliefSide));
               store.setUi({ activeRelief: store.doc.reliefs.at(-1)?.id });
             }}
           />
@@ -111,7 +140,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
   return (
     <div className="sidebar-scroll">
       <Section
-        title="Relief"
+        title={title}
         icon={Mountain}
         actions={
           <Btn
@@ -131,6 +160,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
             · {relief.cols}×{relief.rows} cells at {relief.resolution} mm
           </span>
         </div>
+        {back && backHint}
         {error && <Hint tone="error">{error}</Hint>}
         <div className="row">
           <Btn
@@ -220,6 +250,10 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
           />
         </div>
       </Section>
+
+      <SweepSection store={store} />
+      <TextureSection store={store} />
+      <SculptSection store={store} />
 
       <Section title="Whole relief" icon={Box} collapsible defaultOpen={false}>
         <div className="row">

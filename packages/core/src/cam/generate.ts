@@ -5,7 +5,9 @@ import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
 import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
-import { evaluateRelief, gridRange, type ReliefImages } from '../relief/relief';
+import { evaluateRelief, gridRange, type Grid, type ReliefImages } from '../relief/relief';
+import { normalize } from '../vector/clip';
+import type { Vec2 } from '../vector/path';
 import { emitProfile, profileContours } from './profile';
 import { toolLabel, toolProblems } from './tools';
 import type { CamProgram } from './types';
@@ -20,6 +22,18 @@ export const CAM_TOLERANCE = 0.005;
 
 export class ToolpathError extends Error {
   override name = 'ToolpathError';
+}
+
+/** The grid seen after turning the material over about x = width / 2. */
+export function mirrorGridX(grid: Grid, width: number): Grid {
+  const { cols, rows, resolution: res } = grid;
+  const z = new Float32Array(grid.z.length);
+  for (let c = 0; c < cols; c++) {
+    // Cell whose centre lands on this cell's centre after mirroring (nearest).
+    const src = Math.min(cols - 1, Math.max(0, Math.round((width - (c + 0.5) * res) / res - 0.5)));
+    for (let r = 0; r < rows; r++) z[r * cols + c] = grid.z[r * cols + src] as number;
+  }
+  return { ...grid, z };
 }
 
 export function generateToolpath(
@@ -78,11 +92,46 @@ export function generate(
     case 'finish3d': {
       const relief = project.reliefs.find((r) => r.id === tp.relief);
       if (!relief) throw new ToolpathError(`Toolpath ${tp.id} uses unknown relief "${tp.relief}"`);
-      const pr = placeRelief(evaluateRelief(relief, project, images), topZ, bounds.min[2]);
-      if (pr.maxH - gridRange(pr.grid.z).min > project.stock.thickness + 1e-9) {
-        warnings.push('The relief is deeper than the material; the checker will block export');
+      // A back relief is cut after turning the material over left to right:
+      // mirror the relief and its boundary about the material's centre line.
+      const back = relief.side === 'back';
+      const W = project.stock.width;
+      let grid = evaluateRelief(relief, project, images);
+      if (back) {
+        grid = mirrorGridX(grid, W);
+        warnings.push(
+          'Back relief: turn the material over left to right (about its vertical centre line), keep the same X0 Y0 corner, then run this file',
+        );
       }
-      const boundary = vectors.length ? pocketRegion(vectors, tolerance, warnings) : undefined;
+      const pr = placeRelief(grid, topZ, bounds.min[2]);
+      const depthOf = (g: Grid) => {
+        const r = gridRange(g.z);
+        return r.max - r.min;
+      };
+      const depth = pr.maxH - gridRange(pr.grid.z).min;
+      if (depth > project.stock.thickness + 1e-9) {
+        warnings.push('The relief is deeper than the material; the checker will block export');
+      } else {
+        // The other face's relief eats into the same material from below.
+        const side = relief.side ?? 'front';
+        const other = project.reliefs.filter((r) => (r.side ?? 'front') !== side);
+        const otherDepth = Math.max(
+          0,
+          ...other.map((r) => depthOf(evaluateRelief(r, project, images))),
+        );
+        if (depth + otherDepth > project.stock.thickness + 1e-9) {
+          warnings.push(
+            `The front and back reliefs together are ${(depth + otherDepth).toFixed(1)} mm deep in ${project.stock.thickness} mm material: they will cut through where they overlap`,
+          );
+        }
+      }
+      let boundary = vectors.length ? pocketRegion(vectors, tolerance, warnings) : undefined;
+      if (boundary && back) {
+        boundary = normalize(
+          boundary.map((ring) => ring.map(([x, y]): Vec2 => [W - x, y])),
+          'nonZero',
+        );
+      }
       if (tp.type === 'finish3d') {
         emitFinish3d(b, pr, tool, tp.params, project.stock.width, project.stock.height, boundary);
       } else {

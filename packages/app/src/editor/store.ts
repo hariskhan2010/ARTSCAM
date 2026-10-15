@@ -7,6 +7,7 @@ import {
   type Matrix,
   type ProjectBundle,
   type Project,
+  type Relief,
   type Segment,
   type TextAlign,
   type Vector,
@@ -22,7 +23,17 @@ import type { View } from './geometry';
  */
 
 export type ToolName =
-  'select' | 'node' | 'pen' | 'rect' | 'ellipse' | 'polygon' | 'star' | 'line' | 'text' | 'pan';
+  | 'select'
+  | 'node'
+  | 'pen'
+  | 'rect'
+  | 'ellipse'
+  | 'polygon'
+  | 'star'
+  | 'line'
+  | 'text'
+  | 'pan'
+  | 'sculpt';
 
 /** Text being placed with the Text tool (not part of the document until added). */
 export interface TextDraft {
@@ -52,6 +63,19 @@ export interface ReliefForm {
   smoothRadius: number;
   factor: number;
   imageHeight: number;
+  /** Shapes picked for sweeps (vector ids). */
+  rail?: string;
+  railB?: string;
+  section?: string;
+  endSection?: string;
+  sweepScaleHeight: boolean;
+  texture: Extract<ReliefOp, { op: 'texture' }>['pattern'];
+  textureSpacing: number;
+  textureHeight: number;
+  textureAngle: number;
+  brush: Extract<ReliefOp, { op: 'sculpt' }>['tool'];
+  brushRadius: number;
+  brushStrength: number;
 }
 
 export const DEFAULT_RELIEF_FORM: ReliefForm = {
@@ -63,6 +87,14 @@ export const DEFAULT_RELIEF_FORM: ReliefForm = {
   smoothRadius: 1,
   factor: 0.5,
   imageHeight: 4,
+  sweepScaleHeight: false,
+  texture: 'lines',
+  textureSpacing: 4,
+  textureHeight: 0.5,
+  textureAngle: 0,
+  brush: 'raise',
+  brushRadius: 5,
+  brushStrength: 1,
 };
 
 /** What the right-hand panel shows (picked in the Project tree). */
@@ -88,6 +120,8 @@ export interface UiState {
   reliefForm: ReliefForm;
   /** Relief shown in the Relief panel, the canvas and the 3D view. */
   activeRelief: string | undefined;
+  /** Which face's relief is shown (Project tree: Front Relief / Back Relief). */
+  reliefSide: 'front' | 'back';
   /** The 3D View tab is showing instead of the 2D canvas. */
   show3d: boolean;
   /** Toolpath shown in the CAM panel and previewed on the canvas. */
@@ -97,6 +131,15 @@ export interface UiState {
   textDraft: TextDraft | undefined;
   /** Laid-out outline of the draft text (world mm), for the canvas preview. */
   textPreview: Segment[] | undefined;
+}
+
+/** The relief on the shown side: the active one if it is on that side, else the first there. */
+export function shownRelief(
+  doc: Project,
+  ui: Pick<UiState, 'activeRelief' | 'reliefSide'>,
+): Relief | undefined {
+  const onSide = doc.reliefs.filter((r) => (r.side ?? 'front') === ui.reliefSide);
+  return onSide.find((r) => r.id === ui.activeRelief) ?? onSide[0];
 }
 
 export class EditorStore {
@@ -129,6 +172,7 @@ export class EditorStore {
       sidebarTab: 'design',
       reliefForm: DEFAULT_RELIEF_FORM,
       activeRelief: undefined,
+      reliefSide: 'front',
       show3d: false,
       activeToolpath: undefined,
       activeTool: undefined,

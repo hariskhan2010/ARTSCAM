@@ -216,6 +216,73 @@ describe('3D CAM (M5)', () => {
     expect(plunges.length).toBe(2);
   });
 
+  it('a back relief is machined mirrored left to right, with a flip note', () => {
+    // Bump off-centre at x = 15 on 60 mm wide stock: from the back it is at x = 45.
+    let p = newProject({
+      stock: { width: 60, height: 40, thickness: 25, origin: 'bottom-left', zZero: 'top' },
+    });
+    p = addVectors([
+      { id: 'c', layer: 'L1', closed: true, segments: ellipse(15, 20, 8) },
+      { id: 'b', layer: 'L1', closed: true, segments: rectangle(5, 10, 20, 20) },
+    ]).apply(p);
+    p = addRelief(0.25, 'back', 'back').apply(p);
+    expect(p.reliefs[0]!.side).toBe('back');
+    p = setReliefOp('back', {
+      op: 'fromVector',
+      vector: 'c',
+      profile: 'dome',
+      height: 5,
+      mode: 'add',
+    }).apply(p);
+    p = addTool({ id: 'ball', ...BALL6 }).apply(p);
+    p = addToolpath({
+      id: 'f',
+      type: 'finish3d',
+      tool: 'ball',
+      relief: 'back',
+      vectors: ['b'],
+      params: { pattern: 'x' },
+    }).apply(p);
+    const ex = exportToolpath(projectSchema.parse(p), 'f', { simulated: true });
+    expect(ex.check.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(ex.gcode).toMatch(/\(Note: Back relief: .*turn the material over/);
+    // The boundary (x 5..25) is mirrored to x 35..55: every cut is there.
+    const xs = ex.check.program.moves.flatMap((m) =>
+      m.type === 'rapid' || m.to[2] === null || m.to[2] >= 0 || m.to[0] === null ? [] : [m.to[0]],
+    );
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(35 - 0.01);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(55 + 0.01);
+    // The dome's top (cut highest) is at the mirrored centre x = 45.
+    let top = { z: -Infinity, x: 0 };
+    for (const m of ex.check.program.moves)
+      if (
+        m.type !== 'rapid' &&
+        m.to[2] !== null &&
+        m.to[0] !== null &&
+        m.to[2] < 0 &&
+        m.to[2] > top.z
+      )
+        top = { z: m.to[2], x: m.to[0] };
+    expect(Math.abs(top.x - 45)).toBeLessThan(1);
+  });
+
+  it('warns when front and back reliefs together are deeper than the material', () => {
+    let p = domeProject(10); // front dome 10 mm deep in 25 mm stock
+    p = addRelief(0.5, 'back', 'back').apply(p);
+    const back = (h: number) =>
+      setReliefOp('back', {
+        op: 'fromVector',
+        vector: 'c',
+        profile: 'dome',
+        height: h,
+        mode: 'add',
+      });
+    const warned = (q: Project) =>
+      exportToolpath(q, 'finish', { simulated: true }).program.warnings.join();
+    expect(warned(back(12).apply(p))).not.toMatch(/together/);
+    expect(warned(back(16).apply(p))).toMatch(/front and back reliefs together/);
+  });
+
   it('the checker enforces a ball-nose for finishing', () => {
     const p = domeProject();
     const tp = p.toolpaths.find((t) => t.id === 'finish')!;

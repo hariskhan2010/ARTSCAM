@@ -107,6 +107,59 @@ export const reliefOpSchema = z.discriminatedUnion('op', [
     blur: nonNegative.optional(),
     mode: combineModeSchema,
   }),
+  /**
+   * Sweep a cross-section (an open vector: ends on the base, height measured
+   * from the line between its ends) along a rail vector. With `endSection`
+   * the shape blends from one to the other along the rail.
+   */
+  z.strictObject({
+    op: z.literal('extrude'),
+    rail: id,
+    section: id,
+    endSection: id.optional(),
+    /** Width across the rail, mm. Default: the section's own width. */
+    width: positive.optional(),
+    mode: combineModeSchema,
+  }),
+  /** Turn a cross-section around a centre: its left end at the centre, right end at the rim. */
+  z.strictObject({
+    op: z.literal('spin'),
+    section: id,
+    centre: point,
+    mode: combineModeSchema,
+  }),
+  /** Stretch a cross-section between two rails (left end on rail A). */
+  z.strictObject({
+    op: z.literal('twoRail'),
+    railA: id,
+    railB: id,
+    section: id,
+    /** Scale heights with the distance between the rails. Default false. */
+    scaleHeight: z.boolean().optional(),
+    mode: combineModeSchema,
+  }),
+  /** A repeating pattern over the material, or inside a closed shape. */
+  z.strictObject({
+    op: z.literal('texture'),
+    pattern: z.enum(['lines', 'dimples', 'hammered', 'weave']),
+    /** Repeat distance, mm. */
+    spacing: positive,
+    height: finite,
+    /** Turn of the pattern, degrees counter-clockwise. Default 0. */
+    angle: finite.optional(),
+    /** Closed shape to limit it to. Default: the whole relief. */
+    within: id.optional(),
+    mode: combineModeSchema,
+  }),
+  /** One sculpting brush stroke: the brush centre's path, world mm. */
+  z.strictObject({
+    op: z.literal('sculpt'),
+    tool: z.enum(['raise', 'lower', 'smooth']),
+    radius: positive,
+    /** mm for raise/lower; 0–1 blend for smooth. */
+    strength: nonNegative,
+    points: z.array(point).min(1),
+  }),
   z.strictObject({
     op: z.literal('smooth'),
     radius: positive,
@@ -126,6 +179,12 @@ export const reliefSchema = z.strictObject({
   /** Path of the little-endian Float32 height grid inside the project zip. */
   data: z.string().min(1),
   ops: z.array(reliefOpSchema),
+  /**
+   * Which face it is carved into. A back relief is designed seen from the
+   * front (so it lines up with the front), and machined after turning the
+   * material over left to right. Default front.
+   */
+  side: z.enum(['front', 'back']).optional(),
 });
 
 export const toolSchema = z.strictObject({

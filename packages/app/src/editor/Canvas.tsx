@@ -51,9 +51,19 @@ import {
 } from './nodes';
 import type { CamRunner } from '../cam/runner';
 import type { SimResult } from '../cam/protocol';
-import { useStore, type EditorStore } from './store';
+import { shownRelief, useStore, type EditorStore } from './store';
 import { currentView } from './viewActions';
-import { copySelection, cutSelection, pasteClipboard } from '../actions';
+import { copySelection, cutSelection, pasteClipboard, sculptStroke } from '../actions';
+
+/** A brush stroke as an open polyline, for the canvas preview. */
+function strokeSegments(points: readonly [number, number][]): Segment[] {
+  const [first, ...rest] = points;
+  if (!first) return [];
+  return [
+    { type: 'move', p: first },
+    ...(rest.length ? rest : [first]).map((p): Segment => ({ type: 'line', p })),
+  ];
+}
 
 /** Hit radius in screen pixels. */
 const HIT_PX = 6;
@@ -78,7 +88,8 @@ type Drag =
   | { kind: 'marquee'; start: Vec2; additive: boolean }
   | { kind: 'shape'; start: Vec2 }
   | { kind: 'node'; id: string; ref: NodeRef }
-  | { kind: 'pen'; node: number };
+  | { kind: 'pen'; node: number }
+  | { kind: 'sculpt'; points: [number, number][] };
 
 /** Live preview shown while dragging, before the command is committed. */
 type Preview =
@@ -329,8 +340,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
     }
     // Relief heights as a shaded image while working on the relief.
     if (store.ui.sidebarTab === 'relief') {
-      const rel =
-        store.doc.reliefs.find((r) => r.id === store.ui.activeRelief) ?? store.doc.reliefs[0];
+      const rel = shownRelief(store.doc, store.ui);
       const g = rel ? store.relief(rel.id).grid : undefined;
       if (g) {
         ctx.imageSmoothingEnabled = true;
@@ -685,6 +695,18 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       return;
     }
 
+    if (tool === 'sculpt') {
+      // Raw (unsnapped) brush path; becomes one relief step on release.
+      dragRef.current = { kind: 'sculpt', points: [[p[0], p[1]]] };
+      previewRef.current = {
+        kind: 'draft',
+        segments: strokeSegments([[p[0], p[1]]]),
+        closed: false,
+      };
+      draw();
+      return;
+    }
+
     if (tool === 'text') {
       const at = snapped(p);
       const draft = store.ui.textDraft;
@@ -799,6 +821,14 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         }
         break;
       }
+      case 'sculpt': {
+        // Keep a point every ~quarter brush radius: enough for a smooth stroke.
+        const last = d.points.at(-1) as [number, number];
+        const step = Math.max(0.05, store.ui.reliefForm.brushRadius / 4);
+        if (Math.hypot(p[0] - last[0], p[1] - last[1]) >= step) d.points.push([p[0], p[1]]);
+        previewRef.current = { kind: 'draft', segments: strokeSegments(d.points), closed: false };
+        break;
+      }
       case 'pen': {
         const node = penRef.current[d.node];
         if (node) {
@@ -871,6 +901,12 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         };
         draw();
         return;
+      case 'sculpt': {
+        const last = d.points.at(-1) as [number, number];
+        if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 1e-6) d.points.push([p[0], p[1]]);
+        sculptStroke(store, d.points);
+        break;
+      }
       case 'pan':
         break;
     }
@@ -1022,6 +1058,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
         l: 'line',
         h: 'pan',
         t: 'text',
+        b: 'sculpt',
       };
       const t = tools[key];
       if (t) {

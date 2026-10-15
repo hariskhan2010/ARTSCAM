@@ -86,6 +86,24 @@ export function addVectors(vectors: readonly NewVector[], label = 'Add vector'):
   };
 }
 
+/** Ids of the vectors a relief op is built from. */
+export function reliefOpVectors(op: ReliefOp): string[] {
+  switch (op.op) {
+    case 'fromVector':
+      return [op.vector];
+    case 'extrude':
+      return [op.rail, op.section, ...(op.endSection ? [op.endSection] : [])];
+    case 'spin':
+      return [op.section];
+    case 'twoRail':
+      return [op.railA, op.railB, op.section];
+    case 'texture':
+      return op.within ? [op.within] : [];
+    default:
+      return [];
+  }
+}
+
 export function deleteVectors(ids: readonly string[]): ProjectCommand {
   return {
     label: ids.length === 1 ? 'Delete vector' : 'Delete vectors',
@@ -99,7 +117,7 @@ export function deleteVectors(ids: readonly string[]): ProjectCommand {
         .map((tp) => ({ ...tp, vectors: tp.vectors.filter((v) => !drop.has(v)) })) as Toolpath[];
       const reliefs = p.reliefs.map((r) => ({
         ...r,
-        ops: r.ops.filter((op) => op.op !== 'fromVector' || !drop.has(op.vector)),
+        ops: r.ops.filter((op) => !reliefOpVectors(op).some((v) => drop.has(v))),
       }));
       return { ...p, vectors: p.vectors.filter((v) => !drop.has(v.id)), toolpaths, reliefs };
     },
@@ -335,9 +353,13 @@ export function deleteToolpath(id: string): ProjectCommand {
 // --- Reliefs (M4) -------------------------------------------------------------
 
 /** A new empty relief covering the material at `resolution` mm per cell. */
-export function addRelief(resolution: number, id?: string): ProjectCommand {
+export function addRelief(
+  resolution: number,
+  id?: string,
+  side: 'front' | 'back' = 'front',
+): ProjectCommand {
   return {
-    label: 'New relief',
+    label: side === 'back' ? 'New back relief' : 'New relief',
     apply: (p) => {
       if (!(resolution > 0)) return p;
       const rid = id ?? nextId('r', p.reliefs);
@@ -347,7 +369,15 @@ export function addRelief(resolution: number, id?: string): ProjectCommand {
         ...p,
         reliefs: [
           ...p.reliefs,
-          { id: rid, resolution, cols, rows, data: `reliefs/${rid}.f32`, ops: [] },
+          {
+            id: rid,
+            resolution,
+            cols,
+            rows,
+            data: `reliefs/${rid}.f32`,
+            ops: [],
+            ...(side === 'back' && { side }),
+          },
         ],
       };
     },
@@ -367,6 +397,11 @@ export function deleteRelief(id: string): ProjectCommand {
 const RELIEF_OP_LABEL: Record<ReliefOp['op'], string> = {
   fromVector: 'Shape to relief',
   fromImage: 'Image to relief',
+  extrude: 'Extrude',
+  spin: 'Spin',
+  twoRail: 'Two-rail sweep',
+  texture: 'Texture',
+  sculpt: 'Sculpt',
   smooth: 'Smooth relief',
   scale: 'Scale relief',
   offset: 'Offset relief',

@@ -1,4 +1,5 @@
 import {
+  Brush,
   Check,
   Circle,
   Hand,
@@ -76,6 +77,16 @@ export const TOOL_INFO: Record<
     steps: ['Click where the text should start', 'Type in Urdu, Arabic or English'],
   },
   pan: { name: 'Pan', icon: Hand, key: 'H', steps: ['Drag to move the view', 'Scroll to zoom'] },
+  sculpt: {
+    name: 'Sculpt',
+    icon: Brush,
+    key: 'B',
+    steps: [
+      'Drag over the relief to raise, lower or smooth it',
+      'Brush, size and strength are in the Relief panel',
+      'Each stroke is one step: Ctrl+Z undoes it',
+    ],
+  },
 };
 
 export function CanvasOverlay(props: {

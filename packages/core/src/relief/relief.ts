@@ -1,6 +1,9 @@
 import type { Project, Relief, ReliefOp, Stock } from '../model/schema';
 import { flatten } from '../vector/flatten';
 import type { Vec2 } from '../vector/path';
+import { applyExtrude, applySpin, applyTwoRail } from './sweep';
+import { applyTexture } from './texture';
+import { applySculpt } from './sculpt';
 
 /**
  * Relief engine (plan.md M4 / T4.1–T4.2). A relief is a height grid laid over
@@ -308,6 +311,44 @@ export function applyOp(g: Grid, op: ReliefOp, project: Project, images: ReliefI
       }
       return;
     }
+    case 'extrude':
+    case 'spin':
+    case 'twoRail': {
+      const target = {
+        cols,
+        rows,
+        resolution: res,
+        put: (i: number, h: number) => combineAt(z, i, h, op.mode),
+      };
+      try {
+        if (op.op === 'extrude') applyExtrude(target, op, project);
+        else if (op.op === 'spin') applySpin(target, op, project);
+        else applyTwoRail(target, op, project);
+      } catch (e) {
+        throw new ReliefError((e as Error).message);
+      }
+      return;
+    }
+    case 'texture': {
+      let mask: Uint8Array | undefined;
+      if (op.within) {
+        const v = project.vectors.find((x) => x.id === op.within);
+        if (!v) throw new ReliefError(`Texture uses unknown vector "${op.within}"`);
+        if (!v.closed) throw new ReliefError('A texture can only be limited to a closed shape');
+        mask = rasterize(
+          flatten(v.segments, Math.min(0.02, res / 4), true).map((p) => p.points),
+          g,
+        );
+      }
+      applyTexture(
+        { cols, rows, resolution: res, mask, put: (i, h) => combineAt(z, i, h, op.mode) },
+        op,
+      );
+      return;
+    }
+    case 'sculpt':
+      applySculpt(g, op);
+      return;
     case 'smooth':
       boxBlur(z, cols, rows, op.radius / res, op.passes);
       return;

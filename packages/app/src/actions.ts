@@ -31,7 +31,7 @@ import {
   type Vector,
 } from '@naqsh/core';
 import type { CamRunner } from './cam/runner';
-import type { EditorStore, ReliefForm } from './editor/store';
+import { shownRelief, type EditorStore, type ReliefForm } from './editor/store';
 import { download, pickFile } from './files';
 
 /**
@@ -303,15 +303,19 @@ export function transformSelection(store: EditorStore, kind: QuickTransform): vo
 type FromVector = Extract<ReliefOp, { op: 'fromVector' }>;
 
 export function activeRelief(store: EditorStore): Relief | undefined {
-  const { reliefs } = store.doc;
-  return reliefs.find((r) => r.id === store.ui.activeRelief) ?? reliefs[0];
+  return shownRelief(store.doc, store.ui);
 }
 
-/** The active relief, creating one at the form's resolution when there is none. */
+/** Shows the front or back relief in the Relief panel, canvas and 3D view. */
+export function openReliefSide(store: EditorStore, side: 'front' | 'back') {
+  store.setUi({ sidebarTab: 'relief', reliefSide: side });
+}
+
+/** The shown relief, creating one on the shown side when there is none. */
 export function ensureRelief(store: EditorStore): Relief {
   const existing = activeRelief(store);
   if (existing) return existing;
-  store.execute(addRelief(store.ui.reliefForm.resolution));
+  store.execute(addRelief(store.ui.reliefForm.resolution, undefined, store.ui.reliefSide));
   const created = store.doc.reliefs.at(-1) as Relief;
   store.setUi({ activeRelief: created.id });
   return created;
@@ -369,6 +373,130 @@ export function scaleRelief(store: EditorStore): void {
 export function invertRelief(store: EditorStore): void {
   const r = needRelief(store);
   if (r) store.execute(setReliefOp(r.id, { op: 'invert' }));
+}
+
+// --- Sweeps, textures, sculpting (M6) ------------------------------------------
+
+export type SweepRole = 'rail' | 'railB' | 'section' | 'endSection';
+
+/** Uses the one selected shape as a sweep's rail or cross-section. */
+export function pickSweepShape(store: EditorStore, role: SweepRole): void {
+  const sel = selectedVectors(store);
+  if (sel.length !== 1) {
+    store.setUi({ message: 'Select one shape first' });
+    return;
+  }
+  const v = sel[0] as Vector;
+  if (role.startsWith('section') || role === 'endSection') {
+    if (v.closed) {
+      store.setUi({
+        message: 'A cross-section is an open shape (draw it with the line or pen tool)',
+      });
+      return;
+    }
+  }
+  setReliefForm(store, { [role]: v.id });
+}
+
+/** The picked shape's id, if it still exists. */
+export function sweepShape(store: EditorStore, role: SweepRole): string | undefined {
+  const id = store.ui.reliefForm[role];
+  return id && store.doc.vectors.some((v) => v.id === id) ? id : undefined;
+}
+
+/** Runs a relief step, reporting a failure (e.g. a bad cross-section) instead of keeping it. */
+function addReliefStep(store: EditorStore, op: ReliefOp): void {
+  const relief = ensureRelief(store);
+  store.execute(setReliefOp(relief.id, op));
+  const err = store.relief(relief.id).error;
+  if (err) {
+    store.undo();
+    store.setUi({ message: err });
+  }
+}
+
+export function addExtrude(store: EditorStore): void {
+  const rail = sweepShape(store, 'rail');
+  const section = sweepShape(store, 'section');
+  if (!rail || !section) {
+    store.setUi({ message: 'Pick a rail and a cross-section first' });
+    return;
+  }
+  const end = sweepShape(store, 'endSection');
+  addReliefStep(store, {
+    op: 'extrude',
+    rail,
+    section,
+    ...(end && { endSection: end }),
+    mode: store.ui.reliefForm.mode,
+  });
+}
+
+export function addSpin(store: EditorStore): void {
+  const section = sweepShape(store, 'section');
+  const v = store.doc.vectors.find((x) => x.id === section);
+  if (!section || !v) {
+    store.setUi({ message: 'Pick a cross-section first' });
+    return;
+  }
+  // The centre is the section's left end: draw it from the centre outward.
+  const pts = flatten(v.segments, 0.01, false).flatMap((p) => p.points);
+  const a = pts[0];
+  const b = pts.at(-1);
+  if (!a || !b) return;
+  const centre = a[0] <= b[0] ? a : b;
+  addReliefStep(store, {
+    op: 'spin',
+    section,
+    centre: [centre[0], centre[1]],
+    mode: store.ui.reliefForm.mode,
+  });
+}
+
+export function addTwoRail(store: EditorStore): void {
+  const railA = sweepShape(store, 'rail');
+  const railB = sweepShape(store, 'railB');
+  const section = sweepShape(store, 'section');
+  if (!railA || !railB || !section) {
+    store.setUi({ message: 'Pick two rails and a cross-section first' });
+    return;
+  }
+  addReliefStep(store, {
+    op: 'twoRail',
+    railA,
+    railB,
+    section,
+    ...(store.ui.reliefForm.sweepScaleHeight && { scaleHeight: true }),
+    mode: store.ui.reliefForm.mode,
+  });
+}
+
+/** Adds the form's texture, inside the one selected closed shape if there is one. */
+export function addTexture(store: EditorStore): void {
+  const f = store.ui.reliefForm;
+  const sel = selectedVectors(store).filter((v) => v.closed);
+  addReliefStep(store, {
+    op: 'texture',
+    pattern: f.texture,
+    spacing: f.textureSpacing,
+    height: f.textureHeight,
+    ...(f.textureAngle ? { angle: f.textureAngle } : {}),
+    ...(sel.length === 1 && { within: (sel[0] as Vector).id }),
+    mode: f.mode,
+  });
+}
+
+/** One brush stroke (world mm points) with the form's brush. */
+export function sculptStroke(store: EditorStore, points: [number, number][]): void {
+  if (points.length === 0) return;
+  const f = store.ui.reliefForm;
+  addReliefStep(store, {
+    op: 'sculpt',
+    tool: f.brush,
+    radius: f.brushRadius,
+    strength: f.brushStrength,
+    points,
+  });
 }
 
 export function exportStl(store: EditorStore): void {

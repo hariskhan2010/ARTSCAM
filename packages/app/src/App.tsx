@@ -5,7 +5,7 @@ import { loadAutosave, saveAutosave } from './autosave';
 import { CamRunner } from './cam/runner';
 import { Canvas } from './editor/Canvas';
 import { Relief3D } from './editor/Relief3D';
-import { useStore, EditorStore } from './editor/store';
+import { shownRelief, useStore, EditorStore } from './editor/store';
 import { zoomPercent } from './editor/viewActions';
 import { menus, toolbarRow1, toolbarRow2, toolStrip, zoomBar } from './layout/commands';
 import { IconBar } from './layout/IconBar';
@@ -59,8 +59,8 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
   }, [store]);
   useStore(store);
   const { ui, doc } = store;
-  const shownRelief = doc.reliefs.find((r) => r.id === ui.activeRelief) ?? doc.reliefs[0];
-  const reliefGrid = shownRelief ? store.relief(shownRelief.id).grid : undefined;
+  const relief3d = shownRelief(doc, ui);
+  const reliefGrid = relief3d ? store.relief(relief3d.id).grid : undefined;
 
   return (
     <div className="app">

@@ -12,8 +12,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { addImageRelief, ensureRelief } from '../actions';
-import type { EditorStore, SidebarTab } from '../editor/store';
+import { addImageRelief, ensureRelief, openReliefSide } from '../actions';
+import { shownRelief, type EditorStore, type SidebarTab } from '../editor/store';
 import { COMING_LATER } from './MenuBar';
 import { TOOL_ICON } from './commands';
 
@@ -92,7 +92,34 @@ export function ProjectTree({ store }: { store: EditorStore }) {
   const open = (sidebarTab: SidebarTab, patch: Parameters<EditorStore['setUi']>[0] = {}) =>
     store.setUi({ sidebarTab, ...patch });
   const images = doc.reliefs.flatMap((r) => r.ops.filter((o) => o.op === 'fromImage'));
-  const relief = doc.reliefs.find((r) => r.id === ui.activeRelief) ?? doc.reliefs[0];
+  const front = shownRelief(doc, { ...ui, reliefSide: 'front' });
+  const back = shownRelief(doc, { ...ui, reliefSide: 'back' });
+  const reliefNode = (side: 'front' | 'back') => {
+    const relief = side === 'front' ? front : back;
+    const label = side === 'front' ? 'Front Relief' : 'Back Relief';
+    return (
+      <Node
+        icon={Mountain}
+        label={label}
+        count={relief ? relief.ops.length : undefined}
+        selected={tab === 'relief' && ui.reliefSide === side}
+        testId={side === 'front' ? 'tab-relief' : 'tree-back-relief'}
+        onClick={() => openReliefSide(store, side)}
+        add={
+          relief
+            ? undefined
+            : {
+                title: side === 'front' ? 'Create the relief' : 'Create the back relief',
+                testId: side === 'front' ? 'tree-add-relief' : 'tree-add-back-relief',
+                onClick: () => {
+                  openReliefSide(store, side);
+                  ensureRelief(store);
+                },
+              }
+        }
+      />
+    );
+  };
 
   return (
     <nav className="project-tree" aria-label="Project">
@@ -145,27 +172,8 @@ export function ProjectTree({ store }: { store: EditorStore }) {
             },
           }}
         />
-        <Node
-          icon={Mountain}
-          label="Front Relief"
-          count={relief ? relief.ops.length : undefined}
-          selected={tab === 'relief'}
-          testId="tab-relief"
-          onClick={() => open('relief')}
-          add={
-            relief
-              ? undefined
-              : {
-                  title: 'Create the relief',
-                  testId: 'tree-add-relief',
-                  onClick: () => {
-                    ensureRelief(store);
-                    open('relief');
-                  },
-                }
-          }
-        />
-        <Node icon={Mountain} label="Back Relief" later testId="tree-back-relief" />
+        {reliefNode('front')}
+        {reliefNode('back')}
         <Node icon={SquareStack} label="Clipart" later testId="tree-clipart" />
         <Node icon={Sheet} label="Sheets" later testId="tree-sheets" />
         <Node
