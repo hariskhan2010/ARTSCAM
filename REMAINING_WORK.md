@@ -10,6 +10,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **M3** Text (Urdu/Arabic/Latin via HarfBuzz; Naskh and Nastaliq bundled; own fonts) and V-carve.
 - UI redesign: icons, tool hints, clearer panels.
 - ArtCAM-style layout (positions and order only; own icons, colours and name): menu bar, two toolbar rows, left tool strip, 2D/3D View tabs with a zoom bar, rulers (mm/inch), Project tree with the item's panel below, Model Information, status bar with X Y Z and W H. Cut/copy/paste, zoom previous and zoom to selection added. Placeholders (array, eraser, fill, arc, clipart, sheets, turn…) are disabled with "Coming later".
+- **M7** Public beta, software side (T7.1–T7.5): live at https://hariskhan2010.github.io/ARTSCAM/ (deployed by CI from main after every check passes; tested under that sub-path, offline included); Help › Samples (house sign, calligraphy plaque, relief panel; every toolpath checked on each run); user guide in docs/guide (safety table tested against plan.md §7); Help › Report a problem with GitHub issue forms and labels; version 0.7.0-beta in Help › About; pilot kit in docs/PILOT.md.
 - Mach3, LinuxCNC and generic G-code output (same safe subset as GRBL, plus a G40 G49 G80 safety line; LinuxCNC files wrapped in %).
 - DXF export, autosave in the browser (restored on reload), and `CLAUDE.md` renamed so Claude Code loads it.
 - Offline mode (PWA): installable; after one visit the whole app, including fonts and text shaping, works with no server. Tested by shutting the server down.
@@ -18,7 +19,7 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 - **M6** Sweeps, textures, sculpting (plan.md T6.1–T6.6): cross-sections are open shapes drawn at true size (ends on the base); extrude along a rail (open or closed, optional end section), spin around the section's left end, two-rail sweep (optionally scaling height with width); textures (lines, dimples, hammered, weave) with spacing, height and angle, over the relief or inside a shape; sculpt brush (raise, lower, smooth) on the canvas, each stroke one undoable step. All in the Relief panel and the Relief menu. Mach3/LinuxCNC posts were already done.
 - **Time estimate (T2.6) checked against grbl-sim:** all 10 golden files within ±10% (most within ±5%); a unit test keeps it there. First moves from an unknown start are now timed from the work origin.
 - **Sender check (T2.5):** all 10 golden files stream to grbl-sim with no error, pass GRBL's own `gvalidate`, and load in CNCjs's G-code loader (`gcode-toolpath`) with correct size and units.
-- Checks: `pnpm run ci` (lint, typecheck, 375 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (22 browser tests on dev; 23 on the production build, including offline).
+- Checks: `pnpm run ci` (lint, typecheck, 383 unit tests, build), `pnpm test:e2e` and `pnpm --filter @naqsh/app test:e2e:prod` (24 browser tests on dev; 25 on the production build, including offline).
 
 ## Blocked: needs you
 
@@ -27,7 +28,8 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 3. **Time estimate on a real machine (optional).** Simulator check is done (see below); a stopwatch on one real job would confirm it.
 4. **Try Mach3/LinuxCNC output on a real controller.** It passes the checker, but hasn't run on real hardware.
 5. **First carved relief (M5 acceptance).** Rough with a flat end mill, then finish with a ball nose (air-cut first), on soft wood.
-6. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh") and which controllers come after GRBL. Licence is decided: MIT (`LICENSE`).
+6. **M7 pilots (docs/PILOT.md):** rename first (the beta address still says ARTSCAM), cut each sample once yourself, then invite 10 pilot users. M7 is done when 8 of them have cut the two set jobs and one of their own with no open `unsafe` issue.
+7. **Open decisions (plan.md §15):** final name (replace "ARTSCAM"/"Naqsh") and which controllers come after GRBL. Licence is decided: MIT (`LICENSE`).
 
 ## Known gaps in finished milestones
 
@@ -43,7 +45,6 @@ Status on 2026-10-14. See `plan.md` for the full spec and `README.md` for how to
 
 | # | Deliverable | Done when |
 |---|---|---|
-| M7 | Public beta: docs, sample projects, 10 pilot users | Pilot users cut real jobs |
 | M8 | Desktop app (Tauri) + Web Serial machine control | Send, jog, run from app |
 | M9 | Jewelry / rotary: wrap on cylinder, ring tools | Ring relief generated and simulated |
 | R | Legacy ArtCAM file import research | Legal + technical go/no-go |
