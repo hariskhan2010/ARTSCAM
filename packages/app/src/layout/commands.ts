@@ -100,6 +100,12 @@ import { zoomBy, zoomFit, zoomPrevious, zoomSelection } from '../editor/viewActi
 import type { IconEntry, IconItem } from './IconBar';
 import type { MenuDef, MenuEntry } from './MenuBar';
 import { SAMPLES } from '../samples';
+import { bugReportUrl, GUIDE_URL, SAFETY_URL, versionText } from '../about';
+
+/** Opens an outside page (guide, issue form) in a new tab. */
+function openLink(url: string) {
+  window.open(url, '_blank', 'noopener');
+}
 
 /**
  * Every command of the menu bar, the two toolbar rows, the left tool strip
@@ -747,19 +753,27 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
           onClick: () => openSample(store, s.id),
         })),
         'separator',
+        { label: 'User guide', onClick: () => openLink(GUIDE_URL) },
+        { label: 'Before the first cut (safety)', onClick: () => openLink(SAFETY_URL) },
         {
           label: 'Keyboard shortcuts',
           onClick: () =>
             store.setUi({
               message:
-                'V select · N points · P pen · L line · R rectangle · E ellipse · G polygon · S star · T text · H pan · Ctrl+Z/Y undo/redo · Ctrl+C/X/V/D · Del',
+                'V select · N points · P pen · L line · R rectangle · E ellipse · G polygon · S star · T text · B sculpt · H pan · Ctrl+Z/Y undo/redo · Ctrl+C/X/V/D · Del',
             }),
+        },
+        'separator',
+        {
+          label: 'Report a problem',
+          title: 'Opens a GitHub issue with the version and browser filled in',
+          onClick: () => openLink(bugReportUrl(navigator.userAgent)),
         },
         {
           label: 'About Naqsh',
           onClick: () =>
             store.setUi({
-              message: 'Naqsh (beta): free, open-source relief carving CAD/CAM in the browser',
+              message: `Naqsh ${versionText()}: free, open-source (MIT) relief carving CAD/CAM in the browser. Beta: air-cut every file first.`,
             }),
         },
       ],

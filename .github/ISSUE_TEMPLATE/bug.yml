@@ -1,0 +1,64 @@
+name: Problem report
+description: Something went wrong in the app, or a file did something unexpected on the machine.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing the beta. If a machine did something unexpected, **stop using that file**
+        and tell us here. Please attach the project file (File › Save) and, for machining problems,
+        the exported `.nc` file: we cannot reproduce problems without them.
+  - type: input
+    id: version
+    attributes:
+      label: Naqsh version
+      description: Help › About shows it. Filled in when you use Help › Report a problem.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and system
+      description: Filled in when you use Help › Report a problem.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Drawing or text
+        - Relief
+        - Toolpaths, simulation or export
+        - On the machine (the G-code)
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1. Open the attached project
+        2. Select the "Cut out" toolpath and press Simulate
+        3. …
+  - type: textarea
+    id: machine
+    attributes:
+      label: Machine (for machining problems)
+      description: Router, controller (GRBL, Mach3, LinuxCNC…), sender, bit used, material.
+  - type: textarea
+    id: files
+    attributes:
+      label: Project and G-code files
+      description: Drag the project .zip and the .nc file here (zip the .nc if GitHub refuses it).
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The machine did something unsafe (moved where it should not, cut too deep, crashed)

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User guide
+    url: https://github.com/hariskhan2010/ARTSCAM/blob/main/docs/guide/README.md
+    about: How to use Naqsh, and the safety checklist before the first cut.

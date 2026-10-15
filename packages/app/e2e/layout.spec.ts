@@ -195,3 +195,22 @@ test('Help › Samples opens a sample project ready to machine', async ({ page }
     timeout: 60_000,
   });
 });
+
+test('Help › About shows the version; Report a problem opens the pre-filled bug form', async ({
+  page,
+}) => {
+  await page.goto('./');
+  await page.getByTestId('menu-help').click();
+  await page.getByTestId('mi-help-about-naqsh').click();
+  await expect(page.getByTestId('message')).toContainText('0.7.0-beta (');
+
+  await page.getByTestId('menu-help').click();
+  // Don't load GitHub in the test: capture the new tab's address only.
+  await page.context().route('https://github.com/**', (r) => r.fulfill({ body: 'ok' }));
+  const popup = page.waitForEvent('popup');
+  await page.getByTestId('mi-help-report-a-problem').click();
+  const url = new URL((await popup).url());
+  expect(url.pathname).toBe('/hariskhan2010/ARTSCAM/issues/new');
+  expect(url.searchParams.get('template')).toBe('bug.yml');
+  expect(url.searchParams.get('version')).toMatch(/^0\.7\.0-beta \(/);
+});
