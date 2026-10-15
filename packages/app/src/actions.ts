@@ -12,6 +12,7 @@ import {
   joinOpenPaths,
   repairSegments,
   setVectorSegments,
+  traceBitmap,
   type AlignMode,
   booleanOp,
   composite,
@@ -761,6 +762,43 @@ export async function addImageRelief(store: EditorStore): Promise<void> {
     );
   } catch (e) {
     store.setUi({ message: `Could not read the image: ${(e as Error).message}` });
+  }
+}
+
+/**
+ * Bitmap › Trace image to vectors: picks an image and adds its dark (or light)
+ * parts as one closed vector, sized and placed by the Bitmaps panel settings.
+ */
+export async function traceImage(store: EditorStore): Promise<void> {
+  const file = await pickFile('image/*');
+  if (!file) return;
+  try {
+    const { px, w, h } = await imageToGray(file);
+    const { doc } = store;
+    const f = store.ui.traceForm;
+    // Fit inside the material like Image to relief, or use the set width; centred.
+    const s = f.fit ? Math.min(doc.stock.width / w, doc.stock.height / h) : f.width / w;
+    const segments = traceBitmap(px, w, h, {
+      threshold: f.threshold,
+      invert: f.invert,
+      turdSize: f.specks,
+      smooth: f.smooth,
+      pixelSize: s,
+      origin: [(doc.stock.width - w * s) / 2, (doc.stock.height - h * s) / 2],
+    });
+    if (segments.length === 0) {
+      store.setUi({ message: 'Nothing to trace: try another threshold or Invert' });
+      return;
+    }
+    const before = new Set(doc.vectors.map((v) => v.id));
+    store.execute(
+      addVectors([{ layer: store.ui.activeLayer, closed: true, segments }], `Trace ${file.name}`),
+    );
+    store.select(store.doc.vectors.filter((v) => !before.has(v.id)).map((v) => v.id));
+    const rings = segments.filter((seg) => seg.type === 'move').length;
+    store.setUi({ message: `Traced ${file.name}: ${rings} outlines in one vector` });
+  } catch (e) {
+    store.setUi({ message: `Could not trace the image: ${(e as Error).message}` });
   }
 }
 
