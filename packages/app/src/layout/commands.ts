@@ -64,6 +64,7 @@ import {
 } from 'lucide-react';
 import {
   addImageRelief,
+  traceImage,
   booleanSelection,
   confirmNew,
   copySelection,
@@ -630,7 +631,13 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
           },
         },
         { label: 'Show bitmaps', onClick: () => show(store, 'bitmaps') },
-        later('Trace bitmap to vectors'),
+        {
+          label: 'Trace image to vectors…',
+          onClick: () => {
+            show(store, 'bitmaps');
+            void traceImage(store);
+          },
+        },
       ],
     },
     {

@@ -101,6 +101,30 @@ export const DEFAULT_RELIEF_FORM: ReliefForm = {
   brushStrength: 1,
 };
 
+/** Bitmap trace settings (Bitmaps panel). */
+export interface TraceForm {
+  /** Gray level 0–255: darker pixels are traced (lighter when inverted). */
+  threshold: number;
+  invert: boolean;
+  /** 0 = straight lines, 1 = smooth curves. */
+  smooth: number;
+  /** Specks smaller than this many pixels are ignored. */
+  specks: number;
+  /** Fit the picture inside the material; otherwise use `width`. */
+  fit: boolean;
+  /** Width of the traced picture on the material (mm) when not fitting. */
+  width: number;
+}
+
+export const DEFAULT_TRACE_FORM: TraceForm = {
+  threshold: 128,
+  invert: false,
+  smooth: 0.5,
+  specks: 4,
+  fit: true,
+  width: 100,
+};
+
 /** What the right-hand panel shows (picked in the Project tree). */
 export type SidebarTab = 'design' | 'bitmaps' | 'relief' | 'cam';
 
@@ -122,6 +146,7 @@ export interface UiState {
   message: string | undefined;
   sidebarTab: SidebarTab;
   reliefForm: ReliefForm;
+  traceForm: TraceForm;
   /** Relief shown in the Relief panel, the canvas and the 3D view. */
   activeRelief: string | undefined;
   /** Which face's relief is shown (Project tree: Front Relief / Back Relief). */
@@ -175,6 +200,7 @@ export class EditorStore {
       message: undefined,
       sidebarTab: 'design',
       reliefForm: DEFAULT_RELIEF_FORM,
+      traceForm: DEFAULT_TRACE_FORM,
       activeRelief: undefined,
       reliefSide: 'front',
       show3d: false,
