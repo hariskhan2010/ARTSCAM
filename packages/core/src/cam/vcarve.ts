@@ -224,12 +224,30 @@ export function emitVcarve(
   const maxLink = JOIN_GAP;
   let above = b.topZ; // everything above this Z has been cut
 
+  // Rings clamped flat on a roughing pass's floor only clear material for the
+  // next pass, so they are spaced out: the ridges left between them are at
+  // most a quarter of a depth pass high. The final pass cuts every ring.
+  const roughSpacing = (tool.stepDown * tanHalf) / 2;
+
   for (const floor of floors) {
     const floorDepth = b.topZ - floor;
+    const clamped = (r: VRing) => r.depth > floorDepth + 1e-9;
+    const roughKeep = new Set<number>();
+    if (floor > (floors.at(-1) as number) + 1e-9) {
+      const ds = [...new Set(rings.filter(clamped).map((r) => r.d))].sort((x, y) => x - y);
+      let lastKept = -Infinity;
+      ds.forEach((d, i) => {
+        if (i === 0 || i === ds.length - 1 || d - lastKept >= roughSpacing - 1e-9) {
+          roughKeep.add(d);
+          lastKept = d;
+        }
+      });
+    }
     type Work = { path: Vec2[]; closed: boolean; ring: VRing; z: number };
     const work: Work[] = [];
     for (const r of rings) {
       if (b.topZ - r.depth >= above - 1e-9) continue; // finished in an earlier pass
+      if (roughKeep.size && clamped(r) && !roughKeep.has(r.d)) continue; // thinned roughing ring
       const z = Math.max(b.topZ - r.depth, floor);
       // The next ring covers this one only if this pass cuts it at its exact depth.
       const nextExact = r.nextD !== undefined && r.nextD / tanHalf <= floorDepth + 1e-9;

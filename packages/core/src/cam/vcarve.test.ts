@@ -110,6 +110,14 @@ describe('V-carve (T3.4)', { timeout: 120_000 }, () => {
     expect(r.maxLeft).toBeLessThan(0.25); // the sliver on the centre line
   });
 
+  it('roughing passes space out the rings that sit on the pass floor', () => {
+    // 10 mm bar, 5 mm deep at the centre: 3 depth passes of 2 mm with a 90° bit.
+    // Every ring at 0.1 mm in every pass was ~6.9 m of cutting; spacing the
+    // floor rings in roughing passes keeps it under 2.5 m (final pass unchanged).
+    const ex = exportToolpath(project(rectangle(50, 50, 60, 10), 6), 'vc', { simulated: true });
+    expect(ex.estimate.cuttingLength).toBeLessThan(2500);
+  });
+
   it('a wide plate is cut flat at the requested depth', () => {
     const r = compareWithIdeal(project(rectangle(50, 50, 40, 30), 3));
     expect(r.ok).toBe(true);
