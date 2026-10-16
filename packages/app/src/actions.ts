@@ -770,10 +770,15 @@ export const TOOLPATH_LABEL: Record<Toolpath['type'], string> = {
   profile: 'Profile',
   pocket: 'Pocket',
   vcarve: 'V-carve',
+  prism: 'Prism carve',
+  inlay: 'V inlay',
   drill: 'Drill',
   rough3d: '3D rough',
   finish3d: '3D finish',
 };
+
+/** Jobs whose sloped faces come from a V-bit's cone. */
+const NEEDS_VBIT: readonly Toolpath['type'][] = ['vcarve', 'prism', 'inlay'];
 
 /** Creates a toolpath of `type` for the selection (or the relief) and makes it active. */
 export function createToolpath(store: EditorStore, type: Toolpath['type']): void {
@@ -782,14 +787,13 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
   const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
   // V-carving needs a V-bit: use one from the library when the active tool is not.
   // Each job prefers the tool type it needs when the library has one.
-  const want =
-    type === 'vcarve'
-      ? 'vbit'
-      : type === 'finish3d'
-        ? 'ballnose'
-        : type === 'rough3d'
-          ? 'flat'
-          : undefined;
+  const want = NEEDS_VBIT.includes(type)
+    ? 'vbit'
+    : type === 'finish3d'
+      ? 'ballnose'
+      : type === 'rough3d'
+        ? 'flat'
+        : undefined;
   const tool =
     want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active;
   const relief = activeRelief(store);
@@ -814,14 +818,18 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
         ? { depth, strategy: 'offset' as const }
         : type === 'vcarve'
           ? { depth: Math.min(6, doc.stock.thickness) }
-          : type === 'rough3d'
-            ? { allowance: 0.5 }
-            : type === 'finish3d'
-              ? { pattern: 'x' as const }
-              : { depth };
-  if (type === 'vcarve' && tool.type !== 'vbit') {
+          : type === 'prism'
+            ? { mode: 'raised' as const, depth }
+            : type === 'inlay'
+              ? { part: 'pocket' as const, depth }
+              : type === 'rough3d'
+                ? { allowance: 0.5 }
+                : type === 'finish3d'
+                  ? { pattern: 'x' as const }
+                  : { depth };
+  if (NEEDS_VBIT.includes(type) && tool.type !== 'vbit') {
     store.setUi({
-      message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
+      message: `${TOOLPATH_LABEL[type]} needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)`,
     });
   }
   const name = `${TOOLPATH_LABEL[type]} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;

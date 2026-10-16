@@ -22,7 +22,8 @@ export type RuleId =
   | 'tool' // tool type does not suit the operation
   | 'preview'; // not simulated yet
 
-export type Operation = 'profile' | 'pocket' | 'drill' | 'vcarve' | 'rough3d' | 'finish3d';
+export type Operation =
+  'profile' | 'pocket' | 'drill' | 'vcarve' | 'prism' | 'inlay' | 'rough3d' | 'finish3d';
 
 export interface CheckContext {
   machine: Pick<Machine, 'travel' | 'maxFeed' | 'safeZ'>;
@@ -57,6 +58,9 @@ export interface CheckResult {
 /** Tool types each operation may use. Operations not listed accept any tool. */
 const TOOLS_FOR: Partial<Record<Operation, readonly Tool['type'][]>> = {
   vcarve: ['vbit'],
+  // The cone's flank forms the sloped faces: only a V-bit gives them.
+  prism: ['vbit'],
+  inlay: ['vbit'],
   finish3d: ['ballnose', 'taperedball'],
 };
 

@@ -1,7 +1,10 @@
 import {
   AVAILABLE_POSTS,
+  DEFAULT_GLUE_GAP,
+  DEFAULT_PLUG_EXTRA,
   TOOL_PRESETS,
   addTool,
+  defaultMargin,
   deleteTool,
   deleteToolpath,
   formatDuration,
@@ -20,6 +23,8 @@ import {
   Download,
   Drill,
   Play,
+  Puzzle,
+  Pyramid,
   Route,
   ScanLine,
   SquareDashed,
@@ -50,6 +55,12 @@ const TYPE_INFO: Record<Toolpath['type'], { label: string; icon: typeof Route; t
   profile: { label: 'Profile', icon: Route, text: 'Cut along or around shapes' },
   pocket: { label: 'Pocket', icon: SquareDashed, text: 'Clear the area inside shapes' },
   vcarve: { label: 'V-carve', icon: Triangle, text: 'Carve lettering and art with a V-bit' },
+  prism: {
+    label: 'Prism carve',
+    icon: Pyramid,
+    text: 'Raise shapes as sharp-ridged bevels with a V-bit',
+  },
+  inlay: { label: 'V inlay', icon: Puzzle, text: 'Pocket and matching plug for a V-bit inlay' },
   drill: { label: 'Drill', icon: Drill, text: 'Drill a hole at each shape’s centre' },
   rough3d: { label: '3D rough', icon: Layers3, text: 'Clear material above a relief in steps' },
   finish3d: { label: '3D finish', icon: Waves, text: 'Follow the relief surface with a ball nose' },
@@ -233,6 +244,17 @@ function ToolsSection({ store }: { store: EditorStore }) {
 function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
   const u: Units = store.doc.units;
   const save = (next: Toolpath) => store.execute(updateToolpath(next));
+  const tool = store.doc.tools.find((t) => t.id === tp.tool);
+  const detail = (value: number | undefined, set: (step: number) => void) => (
+    <NumberField
+      label="Detail"
+      units={u}
+      min={0.01}
+      value={value ?? 0.1}
+      help="Spacing between carving passes. Smaller is sharper but slower."
+      onCommit={set}
+    />
+  );
   const boundary3d = (
     <div className="row" style={{ alignItems: 'center' }}>
       <Hint>
@@ -443,6 +465,140 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
               onCommit={(step) => set({ step })}
             />
           </div>
+          {direction(p.direction, (d) => set({ direction: d }))}
+        </>
+      );
+    }
+    case 'prism': {
+      const p = tp.params;
+      const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
+      const raised = p.mode === 'raised';
+      return (
+        <>
+          <Segmented
+            label="Shapes"
+            testId="tp-prism-mode"
+            value={p.mode}
+            options={[
+              {
+                value: 'raised',
+                label: 'Raised',
+                help: 'Shapes stand up with sloped faces meeting in a ridge; the ground round them is cut away',
+              },
+              {
+                value: 'sunken',
+                label: 'Sunken',
+                help: 'Shapes are carved in with sloped sides, like a V-carve',
+              },
+            ]}
+            onChange={(mode) => set({ mode })}
+          />
+          <div className="grid2">
+            <NumberField
+              label={raised ? 'Ground depth' : 'Max depth'}
+              units={u}
+              min={0.01}
+              value={p.depth}
+              testId="tp-depth"
+              help={
+                raised
+                  ? 'How far the ground round the shapes is cut down; also the tallest the shapes can stand'
+                  : 'Wide areas are cut flat at this depth'
+              }
+              onCommit={(depth) => set({ depth })}
+            />
+            {raised && (
+              <NumberField
+                label="Ground width"
+                units={u}
+                min={0.01}
+                value={p.margin ?? (tool ? defaultMargin(p.depth, tool) : 5)}
+                testId="tp-margin"
+                help="How far round the shapes the ground is cut away"
+                onCommit={(margin) => set({ margin })}
+              />
+            )}
+            {detail(p.step, (step) => set({ step }))}
+          </div>
+          {direction(p.direction, (d) => set({ direction: d }))}
+        </>
+      );
+    }
+    case 'inlay': {
+      const p = tp.params;
+      const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
+      const plug = p.part === 'plug';
+      return (
+        <>
+          <Segmented
+            label="Part"
+            testId="tp-inlay-part"
+            value={p.part}
+            options={[
+              { value: 'pocket', label: 'Pocket', help: 'The recess cut in the base material' },
+              {
+                value: 'plug',
+                label: 'Plug',
+                help: 'The insert, cut mirrored from the inlay material',
+              },
+            ]}
+            onChange={(part) => set({ part })}
+          />
+          <div className="grid2">
+            <NumberField
+              label="Pocket depth"
+              units={u}
+              min={0.01}
+              value={p.depth}
+              testId="tp-depth"
+              help="Use the same depth for the pocket and the plug"
+              onCommit={(depth) => set({ depth })}
+            />
+            {plug && (
+              <>
+                <NumberField
+                  label="Glue gap"
+                  units={u}
+                  min={0}
+                  value={p.glueGap ?? DEFAULT_GLUE_GAP}
+                  help="Space left under the plug for glue"
+                  onCommit={(glueGap) => set({ glueGap })}
+                />
+                <NumberField
+                  label="Plug extra"
+                  units={u}
+                  min={0}
+                  value={p.plugExtra ?? DEFAULT_PLUG_EXTRA}
+                  help="Plug height left above the surface, sawn off after gluing"
+                  onCommit={(plugExtra) => set({ plugExtra })}
+                />
+                <NumberField
+                  label="Ground width"
+                  units={u}
+                  min={0.01}
+                  value={
+                    p.margin ??
+                    (tool
+                      ? defaultMargin(
+                          p.depth -
+                            (p.glueGap ?? DEFAULT_GLUE_GAP) +
+                            (p.plugExtra ?? DEFAULT_PLUG_EXTRA),
+                          tool,
+                        )
+                      : 5)
+                  }
+                  help="How far round the plug the waste is cut away"
+                  onCommit={(margin) => set({ margin })}
+                />
+              </>
+            )}
+            {detail(p.step, (step) => set({ step }))}
+          </div>
+          <Hint>
+            {plug
+              ? 'Cut from the inlay material. Turn it over left to right, glue it into the pocket, then saw off the waste.'
+              : 'Make a second V inlay on the same shapes set to Plug, with the same bit and depth.'}
+          </Hint>
           {direction(p.direction, (d) => set({ direction: d }))}
         </>
       );

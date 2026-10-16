@@ -61,6 +61,8 @@ import {
   Droplets,
   ChevronsUpDown,
   Spline as ArcIcon,
+  Pyramid,
+  Puzzle,
 } from 'lucide-react';
 import {
   addImageRelief,
@@ -119,6 +121,8 @@ const TOOL_ICON: Record<Toolpath['type'], IconItem['icon']> = {
   profile: Route,
   pocket: SquareDashed,
   vcarve: Triangle,
+  prism: Pyramid,
+  inlay: Puzzle,
   drill: Drill,
   rough3d: Layers3,
   finish3d: Waves,
@@ -319,7 +323,16 @@ export function zoomItems(store: EditorStore, prefix: string): IconItem[] {
 
 /** Row 2: view, relief and toolpath tools. */
 export function toolbarRow2(store: EditorStore): IconEntry[] {
-  const tps: Toolpath['type'][] = ['profile', 'pocket', 'vcarve', 'drill', 'rough3d', 'finish3d'];
+  const tps: Toolpath['type'][] = [
+    'profile',
+    'pocket',
+    'vcarve',
+    'prism',
+    'inlay',
+    'drill',
+    'rough3d',
+    'finish3d',
+  ];
   const hasRelief = store.doc.reliefs.length > 0;
   return [
     ...zoomItems(store, 'tb-'),
@@ -491,7 +504,16 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
     checked: ui.tool === id,
     onClick: () => setTool(store, id),
   });
-  const tps: Toolpath['type'][] = ['profile', 'pocket', 'vcarve', 'drill', 'rough3d', 'finish3d'];
+  const tps: Toolpath['type'][] = [
+    'profile',
+    'pocket',
+    'vcarve',
+    'prism',
+    'inlay',
+    'drill',
+    'rough3d',
+    'finish3d',
+  ];
 
   return [
     {

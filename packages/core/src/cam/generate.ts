@@ -4,6 +4,7 @@ import { PathBuilder } from './builder';
 import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
+import { emitInlay, emitPrism } from './prism';
 import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
 import { evaluateRelief, gridRange, type Grid, type ReliefImages } from '../relief/relief';
 import { normalize } from '../vector/clip';
@@ -156,6 +157,18 @@ export function generate(
       }
       emitVcarve(b, pocketRegion(vectors, tolerance, warnings), tool, tp.params, warnings);
       break;
+    case 'prism':
+    case 'inlay': {
+      if (tool.type !== 'vbit') {
+        warnings.push(
+          `${tp.type === 'prism' ? 'Prism carving' : 'V inlays'} need a V-bit; ${toolLabel(tool)} will be rejected by the checker`,
+        );
+      }
+      const region = pocketRegion(vectors, tolerance, warnings);
+      if (tp.type === 'prism') emitPrism(b, region, tool, tp.params, warnings);
+      else emitInlay(b, region, tool, tp.params, warnings);
+      break;
+    }
     case 'drill':
       if (tool.type === 'vbit' || tool.type === 'ballnose') {
         warnings.push(
