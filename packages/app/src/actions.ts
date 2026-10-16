@@ -851,12 +851,17 @@ export const TOOLPATH_LABEL: Record<Toolpath['type'], string> = {
   profile: 'Profile',
   pocket: 'Pocket',
   vcarve: 'V-carve',
+  prism: 'Prism carve',
+  inlay: 'V inlay',
   drill: 'Drill',
   fluting: 'Fluting',
   chamfer: 'Chamfer',
   rough3d: '3D rough',
   finish3d: '3D finish',
 };
+
+/** Jobs whose sloped faces come from a V-bit's cone. */
+const NEEDS_VBIT: readonly Toolpath['type'][] = ['vcarve', 'prism', 'inlay', 'chamfer'];
 
 /** Creates a toolpath of `type` for the selection (or the relief) and makes it active. */
 export function createToolpath(store: EditorStore, type: Toolpath['type']): void {
@@ -865,14 +870,13 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
   const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
   // V-carving needs a V-bit: use one from the library when the active tool is not.
   // Each job prefers the tool type it needs when the library has one.
-  const want =
-    type === 'vcarve' || type === 'chamfer'
-      ? 'vbit'
-      : type === 'finish3d'
-        ? 'ballnose'
-        : type === 'rough3d'
-          ? 'flat'
-          : undefined;
+  const want = NEEDS_VBIT.includes(type)
+    ? 'vbit'
+    : type === 'finish3d'
+      ? 'ballnose'
+      : type === 'rough3d'
+        ? 'flat'
+        : undefined;
   // Fluting takes a ball nose or a V-bit (or a tapered ball).
   const fluteTool =
     type === 'fluting' && active?.type === 'flat'
@@ -907,14 +911,18 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
             ? { depth, rampIn: 10, rampOut: 10 }
             : type === 'chamfer'
               ? { width: 2, side: 'outside' as const }
-              : type === 'rough3d'
-                ? { allowance: 0.5 }
-                : type === 'finish3d'
-                  ? { pattern: 'x' as const }
-                  : { depth };
-  if ((type === 'vcarve' || type === 'chamfer') && tool.type !== 'vbit') {
+              : type === 'prism'
+                ? { mode: 'raised' as const, depth }
+                : type === 'inlay'
+                  ? { part: 'pocket' as const, depth }
+                  : type === 'rough3d'
+                    ? { allowance: 0.5 }
+                    : type === 'finish3d'
+                      ? { pattern: 'x' as const }
+                      : { depth };
+  if (NEEDS_VBIT.includes(type) && tool.type !== 'vbit') {
     store.setUi({
-      message: `${type === 'vcarve' ? 'V-carving' : 'A chamfer'} needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)`,
+      message: `${TOOLPATH_LABEL[type]} needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)`,
     });
   }
   if (type === 'fluting' && tool.type === 'flat') {

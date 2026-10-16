@@ -307,6 +307,48 @@ export const toolpathSchema = z.discriminatedUnion('type', [
   z.strictObject({
     id,
     name: z.string().optional(),
+    type: z.literal('prism'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      /**
+       * Raised: the shapes stand up as ridged prisms on a base cut `depth`
+       * below the top. Sunken: carved in as V-grooves (like a V-carve).
+       */
+      mode: z.enum(['raised', 'sunken']),
+      /** Raised: depth of the base round the shapes; sunken: deepest cut (flat beyond). */
+      depth: positive,
+      /** Raised only: width (mm) of the base cleared round the shapes. Default: see prism.ts. */
+      margin: positive.optional(),
+      /** Spacing (mm) between carving rings. Default 0.1. */
+      step: positive.optional(),
+      direction: cutDirection.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('inlay'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      /** The pocket in the base material, or the plug (carved mirrored) that fills it. */
+      part: z.enum(['pocket', 'plug']),
+      /** Pocket depth (mm); the same value for both parts. */
+      depth: positive,
+      /** Plug only: space (mm) left for glue under the plug's top. Default 0.5. */
+      glueGap: nonNegative.optional(),
+      /** Plug only: extra plug height (mm) standing above the surface, sawn off later. Default 1. */
+      plugExtra: nonNegative.optional(),
+      /** Plug only: width (mm) of the base cleared round the plug. Default: see prism.ts. */
+      margin: positive.optional(),
+      step: positive.optional(),
+      direction: cutDirection.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
     type: z.literal('rough3d'),
     tool: id,
     relief: id,

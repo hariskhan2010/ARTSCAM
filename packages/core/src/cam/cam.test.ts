@@ -761,9 +761,50 @@ function reliefProject(): Project {
   return projectSchema.parse(p);
 }
 
+/** Prism and inlay jobs for their golden files (T6.12; small on purpose). */
+function vbitProject(): Project {
+  let p = newProject();
+  p = addVectors([
+    { id: 'bar', layer: 'L1', closed: true, segments: rectangle(30, 30, 20, 6) },
+  ]).apply(p);
+  p = addTool({ id: 'v90', ...TOOL_PRESETS[7]! }).apply(p);
+  const common = { tool: 'v90', vectors: ['bar'] };
+  const tps: NewToolpath[] = [
+    {
+      id: 'prism-raised',
+      type: 'prism',
+      ...common,
+      params: { mode: 'raised', depth: 2, margin: 3, step: 0.5 },
+    },
+    {
+      id: 'prism-sunken',
+      type: 'prism',
+      ...common,
+      params: { mode: 'sunken', depth: 2, step: 0.5 },
+    },
+    {
+      id: 'inlay-pocket',
+      type: 'inlay',
+      ...common,
+      params: { part: 'pocket', depth: 2, step: 0.5 },
+    },
+    {
+      id: 'inlay-plug',
+      type: 'inlay',
+      ...common,
+      params: { part: 'plug', depth: 2, glueGap: 0.5, plugExtra: 1, margin: 3.5, step: 0.5 },
+    },
+  ];
+  for (const tp of tps) p = addToolpath(tp).apply(p);
+  return projectSchema.parse(p);
+}
+
+const vbit = vbitProject();
+
 const goldenCases: { file: string; project: Project; id: string }[] = [
   { file: 'finish3d.nc', project: reliefProject(), id: 'finish3d' },
   { file: 'rough3d.nc', project: reliefProject(), id: 'rough3d' },
+  ...vbit.toolpaths.map((t) => ({ file: `${t.id}.nc`, project: vbit, id: t.id })),
   ...project.toolpaths.map((t) => ({ file: `${t.id}.nc`, project, id: t.id })),
   { file: 'cutout-inch.nc', project: camProject('inch'), id: 'cutout' },
 ];
@@ -836,12 +877,14 @@ describe('GRBL post + golden files', () => {
   });
 
   it('every generated file passes the checker with the operation-specific tool rule', () => {
-    for (const tp of project.toolpaths) {
-      const res = checkGcode(
-        exportToolpath(project, tp.id, { simulated: true }).gcode,
-        ctx(project, tp.tool, tp.type),
-      );
-      expect(res.issues, tp.id).toEqual([]);
+    for (const p of [project, vbit]) {
+      for (const tp of p.toolpaths) {
+        const res = checkGcode(
+          exportToolpath(p, tp.id, { simulated: true }).gcode,
+          ctx(p, tp.tool, tp.type),
+        );
+        expect(res.issues, tp.id).toEqual([]);
+      }
     }
   });
 });

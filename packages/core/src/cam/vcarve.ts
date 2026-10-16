@@ -119,9 +119,15 @@ export interface VRing {
   level: Region;
 }
 
-interface Level {
+/** One carving level: the rings at one distance d from the edges that bound the cut. */
+export interface VLevel {
   d: number;
+  /** The rings to cut; also what a shallower level checks its coverage against. */
   region: Region;
+  /** Where links at this level's depth cannot gouge. Default: `region`. */
+  level?: Region;
+  /** Tip depth below the stock top (mm): d / tan(½·angle), or the flat depth. */
+  depth: number;
   flat: boolean;
 }
 
@@ -144,13 +150,14 @@ export function vcarveRings(
     );
   }
 
-  const levels: Level[] = [];
+  const levels: VLevel[] = [];
+  const depthAt = (dd: number) => Math.min(dd / tanHalf, maxDepth);
   let d = step;
   let lastGood = 0;
   for (; d <= dMax + 1e-9; d += step) {
     const level = offset(region, -d);
     if (level.length === 0) break;
-    levels.push({ d, region: level, flat: false });
+    levels.push({ d, region: level, depth: depthAt(d), flat: false });
     lastGood = d;
   }
   if (d <= dMax + 1e-9 || lastGood === 0) {
@@ -161,7 +168,7 @@ export function vcarveRings(
       const mid = (lo + hi) / 2;
       const level = offset(region, -mid);
       if (level.length) {
-        levels.push({ d: mid, region: level, flat: false });
+        levels.push({ d: mid, region: level, depth: depthAt(mid), flat: false });
         lo = mid;
       } else hi = mid;
     }
@@ -170,10 +177,18 @@ export function vcarveRings(
     for (let k = 1; k <= 10_000; k++) {
       const level = offset(region, -(dMax + k * tool.stepOver));
       if (level.length === 0) break;
-      levels.push({ d: dMax + k * tool.stepOver, region: level, flat: true });
+      levels.push({ d: dMax + k * tool.stepOver, region: level, depth: maxDepth, flat: true });
     }
   }
+  return ringsFromLevels(levels, climb);
+}
 
+/**
+ * Rings from levels ordered from the edges inward (depth never decreasing),
+ * leaving out the parts of each ring the next level already cuts exactly
+ * (see the economy note at the top).
+ */
+export function ringsFromLevels(levels: readonly VLevel[], climb: boolean): VRing[] {
   const rings: VRing[] = [];
   levels.forEach((lv, i) => {
     const next = levels[i + 1];
@@ -190,9 +205,9 @@ export function vcarveRings(
         pieces: joined ?? [loop],
         d: lv.d,
         nextD: next?.d,
-        depth: Math.min(lv.d / tanHalf, maxDepth),
+        depth: lv.depth,
         flat: lv.flat,
-        level: lv.region,
+        level: lv.level ?? lv.region,
       });
     }
   });
@@ -213,12 +228,26 @@ export function emitVcarve(
   params: VcarveParams,
   warnings: string[],
 ): void {
-  const tanHalf = Math.tan((((tool.angle ?? 90) / 2) * Math.PI) / 180);
   const rings = vcarveRings(region, tool, params, warnings);
   if (rings.length === 0) {
     if (region.length) warnings.push('The shapes are too thin to carve at this step');
     return;
   }
+  emitVRings(b, rings, tool);
+}
+
+/**
+ * Cuts V-bit rings (ordered from the edges inward) in depth passes. Each
+ * ring's tip runs at its own depth, clamped to the pass floor; links stay
+ * inside the shallower ring's `level`, where the cone cannot gouge.
+ */
+export function emitVRings(
+  b: PathBuilder,
+  rings: readonly VRing[],
+  tool: Pick<Tool, 'angle' | 'stepDown'>,
+): void {
+  if (rings.length === 0) return;
+  const tanHalf = Math.tan((((tool.angle ?? 90) / 2) * Math.PI) / 180);
   const deepest = Math.max(...rings.map((r) => r.depth));
   const floors = passDepths(b.topZ, deepest, tool.stepDown);
   const maxLink = JOIN_GAP;
