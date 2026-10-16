@@ -80,6 +80,9 @@ export function toolpathKey(project: Project, toolpathId: string): string {
   return JSON.stringify({
     tp,
     tool: project.tools.find((t) => t.id === tp.tool),
+    ...(tp.type === 'rest3d'
+      ? { restFrom: project.tools.find((t) => t.id === tp.params.restFrom) }
+      : {}),
     vectors: tp.vectors.map((id) => project.vectors.find((v) => v.id === id)),
     relief: 'relief' in tp ? project.reliefs.find((r) => r.id === tp.relief) : undefined,
     reliefVectors:

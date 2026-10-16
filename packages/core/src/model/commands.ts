@@ -303,7 +303,10 @@ export function deleteTool(id: string): ProjectCommand {
   return {
     label: 'Delete tool',
     apply: (p) =>
-      !p.tools.some((t) => t.id === id) || p.toolpaths.some((tp) => tp.tool === id)
+      !p.tools.some((t) => t.id === id) ||
+      p.toolpaths.some(
+        (tp) => tp.tool === id || (tp.type === 'rest3d' && tp.params.restFrom === id),
+      )
         ? p
         : { ...p, tools: p.tools.filter((t) => t.id !== id) },
   };

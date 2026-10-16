@@ -287,8 +287,33 @@ export const toolpathSchema = z.discriminatedUnion('type', [
     relief: id,
     vectors: z.array(id),
     params: z.strictObject({
-      /** Raster direction: lines along X, along Y, or both (X then Y). */
-      pattern: z.enum(['x', 'y', 'xy']),
+      /**
+       * Raster lines along X, along Y, or both (X then Y); a spiral from the
+       * outside of the area to its centre; or rings offset inward from the
+       * area's outline.
+       */
+      pattern: z.enum(['x', 'y', 'xy', 'spiral', 'offset']),
+      /** Distance between passes (mm). Default: the tool's step-over. */
+      stepOver: positive.optional(),
+      /** Raster patterns: turn the lines by this many degrees counter-clockwise. Default 0. */
+      angle: finite.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    /**
+     * 3D rest machining: after finishing with a larger tool, a smaller one
+     * cuts only where the larger one could not reach (narrow grooves, tight
+     * corners), in raster lines along X.
+     */
+    type: z.literal('rest3d'),
+    tool: id,
+    relief: id,
+    vectors: z.array(id),
+    params: z.strictObject({
+      /** The larger finishing tool that has already been run. */
+      restFrom: id,
       /** Distance between raster lines (mm). Default: the tool's step-over. */
       stepOver: positive.optional(),
     }),
@@ -388,6 +413,9 @@ export const projectSchema = projectShape.superRefine((p, ctx) => {
     if (!tools.has(tp.tool)) missing(['toolpaths', i, 'tool'], 'tool', tp.tool);
     if ('relief' in tp && !p.reliefs.some((r) => r.id === tp.relief)) {
       missing(['toolpaths', i, 'relief'], 'relief', tp.relief);
+    }
+    if (tp.type === 'rest3d' && !tools.has(tp.params.restFrom)) {
+      missing(['toolpaths', i, 'params', 'restFrom'], 'tool', tp.params.restFrom);
     }
     tp.vectors.forEach((v, j) => {
       if (!vectors.has(v)) missing(['toolpaths', i, 'vectors', j], 'vector', v);

@@ -4,7 +4,7 @@ import { PathBuilder } from './builder';
 import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
-import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
+import { emitFinish3d, emitRest3d, emitRough3d, placeRelief } from './relief3d';
 import { evaluateRelief, gridRange, type Grid, type ReliefImages } from '../relief/relief';
 import { normalize } from '../vector/clip';
 import type { Vec2 } from '../vector/path';
@@ -61,7 +61,7 @@ export function generate(
   const vectors = tp.vectors
     .map((id) => project.vectors.find((v) => v.id === id))
     .filter((v): v is Vector => !!v);
-  const is3d = tp.type === 'rough3d' || tp.type === 'finish3d';
+  const is3d = tp.type === 'rough3d' || tp.type === 'finish3d' || tp.type === 'rest3d';
   if (vectors.length === 0 && !is3d) throw new ToolpathError(`Toolpath ${tp.id} has no vectors`);
 
   const bounds = stockBounds(project.stock);
@@ -89,7 +89,8 @@ export function generate(
       emitPocket(b, pocketRegion(vectors, tolerance, warnings), tool, tp.params, warnings);
       break;
     case 'rough3d':
-    case 'finish3d': {
+    case 'finish3d':
+    case 'rest3d': {
       const relief = project.reliefs.find((r) => r.id === tp.relief);
       if (!relief) throw new ToolpathError(`Toolpath ${tp.id} uses unknown relief "${tp.relief}"`);
       // A back relief is cut after turning the material over left to right:
@@ -134,6 +135,28 @@ export function generate(
       }
       if (tp.type === 'finish3d') {
         emitFinish3d(b, pr, tool, tp.params, project.stock.width, project.stock.height, boundary);
+      } else if (tp.type === 'rest3d') {
+        const big = project.tools.find((t) => t.id === tp.params.restFrom);
+        if (!big) {
+          throw new ToolpathError(
+            `Toolpath ${tp.id} machines after unknown tool "${tp.params.restFrom}"`,
+          );
+        }
+        if (big.diameter <= tool.diameter) {
+          warnings.push(
+            `Rest machining: ${toolLabel(big)} is not larger than ${toolLabel(tool)}, so there may be little or nothing left to cut`,
+          );
+        }
+        emitRest3d(
+          b,
+          pr,
+          tool,
+          big,
+          tp.params,
+          project.stock.width,
+          project.stock.height,
+          boundary,
+        );
       } else {
         emitRough3d(
           b,

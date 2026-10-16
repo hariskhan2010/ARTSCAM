@@ -430,12 +430,53 @@ function reliefProject(): Project {
     vectors: [],
     params: { allowance: 0.5 },
   }).apply(p);
+  p = addToolpath({
+    id: 'finish3d-spiral',
+    name: 'Relief spiral finish',
+    type: 'finish3d',
+    tool: 'ball',
+    relief: 'r1',
+    vectors: [],
+    params: { pattern: 'spiral' },
+  }).apply(p);
+  return projectSchema.parse(p);
+}
+
+/** Small job for the rest-machining golden: a 4 mm groove in a plate, after a 6 mm ball. */
+function grooveProject(): Project {
+  let p = newProject({
+    stock: { width: 20, height: 16, thickness: 10, origin: 'bottom-left', zZero: 'top' },
+  });
+  p = addVectors([
+    { id: 'plate', layer: 'L1', closed: true, segments: rectangle(-2, -2, 24, 20) },
+    { id: 'groove', layer: 'L1', closed: true, segments: rectangle(8, 4, 4, 8) },
+  ]).apply(p);
+  p = addRelief(0.5, 'r1').apply(p);
+  for (const [vector, height, mode] of [
+    ['plate', 4, 'add'],
+    ['groove', 2, 'subtract'],
+  ] as const) {
+    p = setReliefOp('r1', { op: 'fromVector', vector, profile: 'flat', height, mode }).apply(p);
+  }
+  p = addTool({ id: 'ball', ...TOOL_PRESETS[5]! }).apply(p);
+  p = addTool({ id: 'small', ...TOOL_PRESETS[4]!, stepOver: 1 }).apply(p);
+  p = addToolpath({
+    id: 'rest3d',
+    name: 'Groove rest',
+    type: 'rest3d',
+    tool: 'small',
+    relief: 'r1',
+    vectors: [],
+    params: { restFrom: 'ball' },
+  }).apply(p);
   return projectSchema.parse(p);
 }
 
 const goldenCases: { file: string; project: Project; id: string }[] = [
   { file: 'finish3d.nc', project: reliefProject(), id: 'finish3d' },
   { file: 'rough3d.nc', project: reliefProject(), id: 'rough3d' },
+  { file: 'finish3d-spiral.nc', project: reliefProject(), id: 'finish3d-spiral' },
+  { file: 'rest3d.nc', project: grooveProject(), id: 'rest3d' },
   ...project.toolpaths.map((t) => ({ file: `${t.id}.nc`, project, id: t.id })),
   { file: 'cutout-inch.nc', project: camProject('inch'), id: 'cutout' },
 ];

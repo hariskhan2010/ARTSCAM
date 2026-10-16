@@ -22,7 +22,8 @@ export type RuleId =
   | 'tool' // tool type does not suit the operation
   | 'preview'; // not simulated yet
 
-export type Operation = 'profile' | 'pocket' | 'drill' | 'vcarve' | 'rough3d' | 'finish3d';
+export type Operation =
+  'profile' | 'pocket' | 'drill' | 'vcarve' | 'rough3d' | 'finish3d' | 'rest3d';
 
 export interface CheckContext {
   machine: Pick<Machine, 'travel' | 'maxFeed' | 'safeZ'>;
@@ -58,6 +59,7 @@ export interface CheckResult {
 const TOOLS_FOR: Partial<Record<Operation, readonly Tool['type'][]>> = {
   vcarve: ['vbit'],
   finish3d: ['ballnose', 'taperedball'],
+  rest3d: ['ballnose', 'taperedball'],
 };
 
 const EPS = 1e-6;
