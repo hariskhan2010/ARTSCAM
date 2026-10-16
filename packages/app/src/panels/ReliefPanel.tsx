@@ -21,6 +21,7 @@ import type { EditorStore, ReliefForm } from '../editor/store';
 import {
   activeRelief,
   addImageRelief,
+  clipName,
   exportStl,
   invertRelief,
   scaleRelief,
@@ -50,6 +51,8 @@ function describe(op: ReliefOp, vectors: Vector[]): string {
     }
     case 'fromImage':
       return `Image ${op.px}×${op.py} px · ${op.height} mm${op.invert ? ' · inverted' : ''} · ${op.mode}`;
+    case 'paste':
+      return `Clipart ${clipName(op.clip)} · ${op.w.toFixed(1)} × ${op.h.toFixed(1)} mm · ${op.height.toFixed(2)} mm${op.rotation ? ` · turned ${op.rotation}°` : ''} · ${op.mode}`;
     case 'extrude': {
       const n = (id: string) => vectors.findIndex((v) => v.id === id) + 1 || '?';
       return `Extrude along shape ${n(op.rail)} · section ${n(op.section)}${op.endSection ? ` → ${n(op.endSection)}` : ''} · ${op.mode}`;

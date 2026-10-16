@@ -15,6 +15,7 @@ import { ProjectTree } from './layout/ProjectTree';
 import { Rulers } from './layout/Rulers';
 import { BitmapsPanel } from './panels/BitmapsPanel';
 import { CamPanel } from './panels/CamPanel';
+import { ClipartPanel } from './panels/ClipartPanel';
 import { DesignPanel } from './panels/DesignPanel';
 import { ReliefPanel } from './panels/ReliefPanel';
 
@@ -31,7 +32,7 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
     () =>
       new CamRunner(
         () => store.touch(),
-        () => store.images,
+        () => ({ images: store.images, clips: store.clips }),
       ),
     [store],
   );
@@ -44,7 +45,7 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
     void loadAutosave().then((saved) => {
       if (!active || !saved || store.history.canUndo || store.doc.vectors.length) return;
       if (saved.project.vectors.length === 0 && saved.project.toolpaths.length === 0) return;
-      store.load(saved.project, saved.images);
+      store.load(saved.project, saved.images, saved.clips);
       store.setUi({ message: 'Restored your last session (autosaved in this browser)' });
     });
     const unsubscribe = store.history.subscribe(() => {
@@ -133,6 +134,8 @@ export function App({ initial }: { initial?: EditorStore } = {}) {
             <BitmapsPanel store={store} />
           ) : ui.sidebarTab === 'relief' ? (
             <ReliefPanel store={store} />
+          ) : ui.sidebarTab === 'clipart' ? (
+            <ClipartPanel store={store} />
           ) : (
             <CamPanel store={store} runner={runner} />
           )}

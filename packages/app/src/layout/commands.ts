@@ -444,7 +444,13 @@ export function toolStrip(store: EditorStore): IconEntry[] {
     tool('text', Type, 'Text', 'T'),
     'sep',
     tool('sculpt', Brush, 'Sculpt relief', 'B'),
-    { icon: MountainSnow, title: 'Relief clipart', later: true, testId: 'tool-clipart' },
+    {
+      icon: MountainSnow,
+      title: 'Relief clipart',
+      pressed: store.ui.sidebarTab === 'clipart',
+      onClick: () => show(store, 'clipart'),
+      testId: 'tool-clipart',
+    },
   ];
 }
 
@@ -740,6 +746,11 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
           label: 'Relief',
           checked: ui.sidebarTab === 'relief',
           onClick: () => show(store, 'relief'),
+        },
+        {
+          label: 'Clipart',
+          checked: ui.sidebarTab === 'clipart',
+          onClick: () => show(store, 'clipart'),
         },
         { label: 'Toolpaths', checked: ui.sidebarTab === 'cam', onClick: () => show(store, 'cam') },
       ],

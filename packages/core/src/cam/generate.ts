@@ -5,7 +5,13 @@ import { drillPoints, emitDrill } from './drill';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
 import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
-import { evaluateRelief, gridRange, type Grid, type ReliefImages } from '../relief/relief';
+import {
+  evaluateRelief,
+  gridRange,
+  type Grid,
+  type ReliefClips,
+  type ReliefImages,
+} from '../relief/relief';
 import { normalize } from '../vector/clip';
 import type { Vec2 } from '../vector/path';
 import { emitProfile, profileContours } from './profile';
@@ -41,10 +47,11 @@ export function generateToolpath(
   toolpathId: string,
   tolerance = CAM_TOLERANCE,
   images: ReliefImages = {},
+  clips: ReliefClips = {},
 ): CamProgram {
   const tp = project.toolpaths.find((t) => t.id === toolpathId);
   if (!tp) throw new ToolpathError(`Unknown toolpath "${toolpathId}"`);
-  return generate(project, tp, tolerance, images);
+  return generate(project, tp, tolerance, images, clips);
 }
 
 export function generate(
@@ -52,6 +59,7 @@ export function generate(
   tp: Toolpath,
   tolerance = CAM_TOLERANCE,
   images: ReliefImages = {},
+  clips: ReliefClips = {},
 ): CamProgram {
   const tool = project.tools.find((t) => t.id === tp.tool);
   if (!tool) throw new ToolpathError(`Toolpath ${tp.id} uses unknown tool "${tp.tool}"`);
@@ -96,7 +104,7 @@ export function generate(
       // mirror the relief and its boundary about the material's centre line.
       const back = relief.side === 'back';
       const W = project.stock.width;
-      let grid = evaluateRelief(relief, project, images);
+      let grid = evaluateRelief(relief, project, images, clips);
       if (back) {
         grid = mirrorGridX(grid, W);
         warnings.push(
@@ -117,7 +125,7 @@ export function generate(
         const other = project.reliefs.filter((r) => (r.side ?? 'front') !== side);
         const otherDepth = Math.max(
           0,
-          ...other.map((r) => depthOf(evaluateRelief(r, project, images))),
+          ...other.map((r) => depthOf(evaluateRelief(r, project, images, clips))),
         );
         if (depth + otherDepth > project.stock.thickness + 1e-9) {
           warnings.push(

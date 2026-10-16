@@ -2,7 +2,9 @@ import { toolpathKey, type Issue, type Project } from '@naqsh/core';
 import type {
   CamRequest,
   CamResponse,
+  Clips,
   ExportResultMsg,
+  Images,
   PreviewResult,
   SimResult,
 } from './protocol';
@@ -35,8 +37,11 @@ export class CamRunner {
 
   constructor(
     private readonly onChange: () => void,
-    /** Relief images, read on every request (they can be added at any time). */
-    private readonly getImages: () => Record<string, Uint8Array> = () => ({}),
+    /** Relief images and clipart, read on every request (they can be added at any time). */
+    private readonly getInputs: () => { images: Images; clips: Clips } = () => ({
+      images: {},
+      clips: {},
+    }),
     private readonly createWorker: () => Worker = () =>
       new Worker(new URL('./cam.worker.ts', import.meta.url), { type: 'module' }),
   ) {}
@@ -78,7 +83,7 @@ export class CamRunner {
       kind: 'preview',
       project,
       toolpathId: tpId,
-      images: this.getImages(),
+      ...this.getInputs(),
     });
     const now = this.state.get(tpId);
     if (now?.key !== key) return; // superseded by a newer edit
@@ -97,7 +102,7 @@ export class CamRunner {
       kind: 'simulate',
       project,
       toolpathId: tpId,
-      images: this.getImages(),
+      ...this.getInputs(),
     });
     if (res.ok && res.kind === 'simulate')
       this.#patch(tpId, { sim: { ...res.result, key }, busy: undefined });
@@ -111,7 +116,7 @@ export class CamRunner {
       project,
       toolpathId: tpId,
       simulated: this.isSimulated(project, tpId),
-      images: this.getImages(),
+      ...this.getInputs(),
     });
     if (res.ok && res.kind === 'export') {
       const { ok, issues, fileName } = res.result;

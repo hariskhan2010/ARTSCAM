@@ -100,7 +100,7 @@ test('project tree shows its panels; + buttons create things; status shows X Y Z
     'Sheets',
     'Toolpaths',
   ]);
-  await expect(page.getByTestId('tree-clipart')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('tree-sheets')).toHaveAttribute('aria-disabled', 'true');
 
   // + on Vectors adds a layer, listed under it.
   await page.getByTestId('tree-add-layer').click();

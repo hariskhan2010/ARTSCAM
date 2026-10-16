@@ -342,7 +342,7 @@ export function Canvas({ store, runner }: { store: EditorStore; runner?: CamRunn
       ctx.stroke();
     }
     // Relief heights as a shaded image while working on the relief.
-    if (store.ui.sidebarTab === 'relief') {
+    if (store.ui.sidebarTab === 'relief' || store.ui.sidebarTab === 'clipart') {
       const rel = shownRelief(store.doc, store.ui);
       const g = rel ? store.relief(rel.id).grid : undefined;
       if (g) {

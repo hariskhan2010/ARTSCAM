@@ -12,9 +12,11 @@ import {
   joinOpenPaths,
   repairSegments,
   setVectorSegments,
+  STARTER_CLIPS,
   type AlignMode,
   booleanOp,
   composite,
+  defaultClipPlacement,
   deleteVectors,
   duplicateVectors,
   exportDxf,
@@ -23,8 +25,13 @@ import {
   importDxf,
   importSvg,
   loadProject,
+  makeStarterClip,
+  meshBounds,
+  meshToHeights,
   newProject,
+  nextId,
   offset,
+  parseMesh,
   projectSchema,
   reliefToStl,
   rotation,
@@ -68,8 +75,8 @@ export async function openProject(store: EditorStore) {
   const file = await pickFile('.zip,.naqsh');
   if (!file) return;
   try {
-    const { project, images } = loadProject(new Uint8Array(await file.arrayBuffer()));
-    store.load(project, images);
+    const { project, images, clips } = loadProject(new Uint8Array(await file.arrayBuffer()));
+    store.load(project, images, clips);
     store.setUi({ message: `Opened ${file.name}` });
   } catch (e) {
     store.setUi({ message: (e as Error).message });
@@ -762,6 +769,107 @@ export async function addImageRelief(store: EditorStore): Promise<void> {
   } catch (e) {
     store.setUi({ message: `Could not read the image: ${(e as Error).message}` });
   }
+}
+
+// --- Clipart (T6.10) ------------------------------------------------------------
+
+type Paste = Extract<ReliefOp, { op: 'paste' }>;
+
+/** Starter clips are stored under this prefix plus their library id. */
+const STARTER_PREFIX = 'starter-';
+
+/** Display name of a stored clip. */
+export function clipName(id: string): string {
+  const s = STARTER_CLIPS.find((c) => STARTER_PREFIX + c.id === id);
+  return s ? s.name : `Imported ${id.replace(/^clip/, '#')}`;
+}
+
+/**
+ * Pastes a stored clip centred on the material, a third of its size, into
+ * the shown relief. Creating the relief, if there is none, is part of the
+ * same step, so one undo takes the paste away.
+ */
+function pasteClip(
+  store: EditorStore,
+  clip: string,
+  size: { cols: number; rows: number; aspect: number },
+  height: (w: number) => number,
+): void {
+  const { doc, ui } = store;
+  const place = defaultClipPlacement(doc.stock, size.aspect);
+  const op: Paste = {
+    op: 'paste',
+    clip,
+    cols: size.cols,
+    rows: size.rows,
+    ...place,
+    height: height(place.w),
+    mode: ui.reliefForm.mode,
+  };
+  const existing = activeRelief(store);
+  const rid = existing?.id ?? nextId('r', doc.reliefs);
+  store.execute(
+    composite('Paste clipart', [
+      ...(existing ? [] : [addRelief(ui.reliefForm.resolution, rid, ui.reliefSide)]),
+      setReliefOp(rid, op),
+    ]),
+  );
+  if (!existing) store.setUi({ activeRelief: rid });
+  const err = store.relief(rid).error;
+  if (err) {
+    store.undo();
+    store.setUi({ message: err });
+  }
+}
+
+/** Pastes a piece from the starter library at the form's clip height. */
+export function pasteStarterClip(store: EditorStore, id: string): void {
+  const c = makeStarterClip(id);
+  if (!c) return;
+  const clip = store.addClip(c.z, STARTER_PREFIX + id);
+  const h = store.ui.reliefForm.clipHeight;
+  pasteClip(store, clip, { cols: c.cols, rows: c.rows, aspect: c.cols / c.rows }, () => h);
+}
+
+/** Longest side of an imported mesh's height grid, in cells. */
+const MESH_CELLS = 256;
+
+/**
+ * Import STL/OBJ: the model seen from above (+Z up) becomes a clip, pasted
+ * with its proportions kept (its height scales with its width).
+ */
+export async function importMeshClip(store: EditorStore): Promise<void> {
+  const file = await pickFile('.stl,.obj');
+  if (!file) return;
+  try {
+    const tris = parseMesh(new Uint8Array(await file.arrayBuffer()), file.name);
+    const { min, max } = meshBounds(tris);
+    const span = Math.max(
+      (max[0] as number) - (min[0] as number),
+      (max[1] as number) - (min[1] as number),
+    );
+    if (!(span > 0)) throw new Error('The model has no width seen from above');
+    const m = meshToHeights(tris, span / MESH_CELLS);
+    const clip = store.addClip(m.z);
+    pasteClip(store, clip, { cols: m.cols, rows: m.rows, aspect: m.width / m.height }, (w) =>
+      Math.max(0.01, (m.depth * w) / m.width),
+    );
+    store.setUi({ message: `Imported ${file.name} (${tris.length / 9} triangles)` });
+  } catch (e) {
+    store.setUi({ message: `Could not import the model: ${(e as Error).message}` });
+  }
+}
+
+/** Changes a pasted clip's placement or height (one undoable step). */
+export function updatePaste(
+  store: EditorStore,
+  reliefId: string,
+  index: number,
+  patch: Partial<Pick<Paste, 'x' | 'y' | 'w' | 'h' | 'rotation' | 'height' | 'mode'>>,
+): void {
+  const op = store.doc.reliefs.find((r) => r.id === reliefId)?.ops[index];
+  if (op?.op !== 'paste') return;
+  store.execute(setReliefOp(reliefId, { ...op, ...patch }, index));
 }
 
 // --- Toolpath -----------------------------------------------------------------

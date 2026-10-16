@@ -397,6 +397,7 @@ export function deleteRelief(id: string): ProjectCommand {
 const RELIEF_OP_LABEL: Record<ReliefOp['op'], string> = {
   fromVector: 'Shape to relief',
   fromImage: 'Image to relief',
+  paste: 'Paste clipart',
   extrude: 'Extrude',
   spin: 'Spin',
   twoRail: 'Two-rail sweep',

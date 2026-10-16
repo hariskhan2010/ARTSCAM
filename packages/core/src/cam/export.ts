@@ -3,7 +3,7 @@ import type { Project } from '../model/schema';
 import { postGrbl } from '../post/grbl';
 import { estimateTime, type TimeEstimate } from '../sim/time';
 import { generateToolpath } from './generate';
-import type { ReliefImages } from '../relief/relief';
+import type { ReliefClips, ReliefImages } from '../relief/relief';
 import type { CamProgram } from './types';
 
 /**
@@ -28,6 +28,8 @@ export interface ExportOptions {
   simulated: boolean;
   /** Images used by image reliefs (3D toolpaths). */
   images?: ReliefImages;
+  /** Clipart height grids used by pasted clipart (3D toolpaths). */
+  clips?: ReliefClips;
 }
 
 /** Posts that exist; others are planned for later milestones (plan.md §4). */
@@ -43,7 +45,13 @@ export function exportToolpath(
   toolpathId: string,
   options: ExportOptions,
 ): ExportResult {
-  const program = generateToolpath(project, toolpathId, undefined, options.images ?? {});
+  const program = generateToolpath(
+    project,
+    toolpathId,
+    undefined,
+    options.images ?? {},
+    options.clips ?? {},
+  );
   if (!AVAILABLE_POSTS.includes(project.machine.post)) {
     throw new Error(`The ${project.machine.post} post-processor is not available yet; choose GRBL`);
   }

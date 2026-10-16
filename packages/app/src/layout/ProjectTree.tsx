@@ -92,6 +92,7 @@ export function ProjectTree({ store }: { store: EditorStore }) {
   const open = (sidebarTab: SidebarTab, patch: Parameters<EditorStore['setUi']>[0] = {}) =>
     store.setUi({ sidebarTab, ...patch });
   const images = doc.reliefs.flatMap((r) => r.ops.filter((o) => o.op === 'fromImage'));
+  const clips = doc.reliefs.flatMap((r) => r.ops.filter((o) => o.op === 'paste'));
   const front = shownRelief(doc, { ...ui, reliefSide: 'front' });
   const back = shownRelief(doc, { ...ui, reliefSide: 'back' });
   const reliefNode = (side: 'front' | 'back') => {
@@ -174,7 +175,14 @@ export function ProjectTree({ store }: { store: EditorStore }) {
         />
         {reliefNode('front')}
         {reliefNode('back')}
-        <Node icon={SquareStack} label="Clipart" later testId="tree-clipart" />
+        <Node
+          icon={SquareStack}
+          label="Clipart"
+          count={clips.length}
+          selected={tab === 'clipart'}
+          testId="tree-clipart"
+          onClick={() => open('clipart')}
+        />
         <Node icon={Sheet} label="Sheets" later testId="tree-sheets" />
         <Node
           icon={Route}

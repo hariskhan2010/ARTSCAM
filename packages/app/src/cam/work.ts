@@ -18,6 +18,7 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
         const ex = exportToolpath(req.project, req.toolpathId, {
           simulated: true,
           images: req.images,
+          clips: req.clips ?? {},
         });
         const b = stockBounds(req.project.stock);
         const pts = ex.program.moves.flatMap((m) =>
@@ -44,6 +45,7 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
         const ex = exportToolpath(req.project, req.toolpathId, {
           simulated: true,
           images: req.images,
+          clips: req.clips ?? {},
         });
         const hm = simulate(
           createHeightmap(req.project.stock, { maxCells: SIM_CELLS }),
@@ -64,6 +66,7 @@ export function handle(req: CamRequest): { response: CamResponse; transfer: Tran
         const ex = exportToolpath(req.project, req.toolpathId, {
           simulated: req.simulated,
           images: req.images,
+          clips: req.clips ?? {},
         });
         return {
           response: {

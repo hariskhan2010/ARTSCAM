@@ -65,6 +65,7 @@ describe('project file round-trip', () => {
       project,
       reliefData: {},
       images: {},
+      clips: {},
     });
   });
 

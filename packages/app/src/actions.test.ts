@@ -1,11 +1,13 @@
-import { addVectors, ellipse, rectangle } from '@naqsh/core';
+import { addVectors, ellipse, gridRange, loadProject, rectangle, saveProject } from '@naqsh/core';
 import { describe, expect, it } from 'vitest';
 import {
   copySelection,
   createToolpath,
   cutSelection,
   pasteClipboard,
+  pasteStarterClip,
   shapesToRelief,
+  updatePaste,
   transformSelection,
 } from './actions';
 import { selectionBBox, worldToScreen } from './editor/geometry';
@@ -108,5 +110,42 @@ describe('toolbar actions', () => {
     const b = selectionBBox(store.doc.vectors.filter((v) => v.id === 'v1'));
     expect(b?.minX).toBeCloseTo(10, 9);
     expect(b?.maxX).toBeCloseTo(50, 9);
+  });
+});
+
+describe('clipart (T6.10)', () => {
+  it('pasting into a project with no relief is one undoable step', () => {
+    const store = new EditorStore();
+    pasteStarterClip(store, 'rosette');
+    const r = store.doc.reliefs[0]!;
+    expect(r.ops).toHaveLength(1);
+    const op = r.ops[0]!;
+    if (op.op !== 'paste') throw new Error('expected a paste');
+    // Centred, a third of the material (the default 300 × 200 material).
+    expect(op.x + op.w / 2).toBeCloseTo(store.doc.stock.width / 2);
+    expect(op.h).toBeCloseTo(Math.min(store.doc.stock.width, store.doc.stock.height) / 3);
+    expect(gridRange(store.relief(r.id).grid!.z).max).toBeCloseTo(3, 4);
+    store.undo();
+    expect(store.doc.reliefs).toHaveLength(0);
+  });
+
+  it('pasted clips are saved with the project, and placement edits are steps', () => {
+    const store = new EditorStore();
+    pasteStarterClip(store, 'leaf');
+    pasteStarterClip(store, 'leaf');
+    // The same starter clip is stored once.
+    expect(Object.keys(store.clips)).toEqual(['starter-leaf']);
+    const r = store.doc.reliefs[0]!;
+    updatePaste(store, r.id, 1, { rotation: 90, height: 5 });
+    expect(store.doc.reliefs[0]!.ops[1]).toMatchObject({ rotation: 90, height: 5 });
+    const loaded = loadProject(saveProject(store.bundle()));
+    expect(Object.keys(loaded.clips ?? {})).toEqual(['starter-leaf']);
+    const back = new EditorStore();
+    back.load(loaded.project, loaded.images, loaded.clips);
+    const a = back.relief(r.id).grid!.z;
+    const b = store.relief(r.id).grid!.z;
+    expect(Buffer.from(a.buffer).equals(Buffer.from(b.buffer))).toBe(true);
+    store.undo();
+    expect(store.doc.reliefs[0]!.ops[1]).not.toHaveProperty('rotation');
   });
 });

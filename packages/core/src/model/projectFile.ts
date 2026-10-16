@@ -4,7 +4,9 @@ import { projectSchema, type Project } from './schema';
 
 /**
  * Project file = .zip with `project.json` + one little-endian Float32 grid per
- * relief at `reliefs/<id>.f32` (plan.md §6). Other entries (e.g. thumbnails)
+ * relief at `reliefs/<id>.f32` (plan.md §6), grayscale images at
+ * `images/<id>.gray` and clipart height grids at `clips/<id>.f32` (their
+ * size is in the relief ops that use them). Other entries (e.g. thumbnails)
  * are ignored on load.
  */
 
@@ -19,6 +21,8 @@ export interface ProjectBundle {
   reliefData: Record<string, Float32Array>;
   /** Grayscale images (one byte per pixel, rows top to bottom) used by image reliefs, by id. */
   images?: Record<string, Uint8Array>;
+  /** Clipart height grids (little-endian Float32, row 0 at the bottom) used by paste ops, by id. */
+  clips?: Record<string, Float32Array>;
 }
 
 /** Location of a relief image in the project zip. */
@@ -38,6 +42,33 @@ function checkImages(project: Project, images: Record<string, Uint8Array>): void
           `Image "${op.image}" has ${img.length} pixels, expected ${op.px * op.py}`,
         );
       }
+    }
+  }
+}
+
+/** Location of a clipart height grid in the project zip. */
+export function clipPath(id: string): string {
+  return `clips/${id}.f32`;
+}
+
+function checkClips(project: Project, clips: Record<string, Float32Array>): void {
+  for (const relief of project.reliefs) {
+    for (const op of relief.ops) {
+      if (op.op !== 'paste') continue;
+      const clip = clips[op.clip];
+      if (!clip)
+        throw new ProjectFileError(`Missing clipart "${op.clip}" used by relief "${relief.id}"`);
+      if (clip.length !== op.cols * op.rows) {
+        throw new ProjectFileError(
+          `Clipart "${op.clip}" has ${clip.length} values, expected ${op.cols * op.rows}`,
+        );
+      }
+    }
+  }
+  for (const [id, clip] of Object.entries(clips)) {
+    for (let i = 0; i < clip.length; i++) {
+      if (!Number.isFinite(clip[i]))
+        throw new ProjectFileError(`Clipart "${id}" has a non-finite height at index ${i}`);
     }
   }
 }
@@ -97,6 +128,8 @@ export function saveProject(bundle: ProjectBundle): Uint8Array {
   checkReliefData(project, bundle.reliefData);
   const images = bundle.images ?? {};
   checkImages(project, images);
+  const clips = bundle.clips ?? {};
+  checkClips(project, clips);
 
   const files: Zippable = {
     [PROJECT_JSON_PATH]: strToU8(JSON.stringify(project, null, 2)),
@@ -109,6 +142,7 @@ export function saveProject(bundle: ProjectBundle): Uint8Array {
   // Fixed entry timestamps make saves byte-for-byte deterministic (the file
   // system already records when the project was saved).
   for (const [id, bytes] of Object.entries(images)) files[imagePath(id)] = bytes;
+  for (const [id, grid] of Object.entries(clips)) files[clipPath(id)] = float32ToLE(grid);
   return zipSync(files, { mtime: ZIP_MTIME });
 }
 
@@ -150,5 +184,15 @@ export function loadProject(bytes: Uint8Array): ProjectBundle {
   }
   checkImages(project, images);
 
-  return { project, reliefData, images };
+  const clips: Record<string, Float32Array> = {};
+  for (const [path, bytes] of Object.entries(files)) {
+    const m = /^clips\/(.+)\.f32$/.exec(path);
+    if (!m) continue;
+    if (bytes.length % 4 !== 0)
+      throw new ProjectFileError(`${path} length ${bytes.length} is not a multiple of 4`);
+    clips[m[1] as string] = float32FromLE(bytes);
+  }
+  checkClips(project, clips);
+
+  return { project, reliefData, images, clips };
 }

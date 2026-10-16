@@ -3,8 +3,22 @@ import type { Issue, Project } from '@naqsh/core';
 /** Messages between the UI and the CAM worker. */
 
 export type CamRequest =
-  | { id: number; kind: 'preview'; project: Project; toolpathId: string; images: Images }
-  | { id: number; kind: 'simulate'; project: Project; toolpathId: string; images: Images }
+  | {
+      id: number;
+      kind: 'preview';
+      project: Project;
+      toolpathId: string;
+      images: Images;
+      clips?: Clips;
+    }
+  | {
+      id: number;
+      kind: 'simulate';
+      project: Project;
+      toolpathId: string;
+      images: Images;
+      clips?: Clips;
+    }
   | {
       id: number;
       kind: 'export';
@@ -12,10 +26,14 @@ export type CamRequest =
       toolpathId: string;
       simulated: boolean;
       images: Images;
+      clips?: Clips;
     };
 
 /** Grayscale images used by image reliefs (3D toolpaths need them). */
 export type Images = Record<string, Uint8Array>;
+
+/** Clipart height grids used by pasted clipart. */
+export type Clips = Record<string, Float32Array>;
 
 export interface PreviewResult {
   /** x, y, z, kind per move, in world coordinates (kind: 0 rapid, 1 plunge, 2 cut). */

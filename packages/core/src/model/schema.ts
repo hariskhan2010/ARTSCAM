@@ -108,6 +108,26 @@ export const reliefOpSchema = z.discriminatedUnion('op', [
     mode: combineModeSchema,
   }),
   /**
+   * Relief clipart: a stored height grid (clips/<id>.f32 in the project zip,
+   * `cols` × `rows`, row 0 at the bottom) placed in a rectangle on the
+   * material, turned `rotation` degrees counter-clockwise about the
+   * rectangle's centre. The clip's highest point becomes `height` mm.
+   */
+  z.strictObject({
+    op: z.literal('paste'),
+    clip: id,
+    cols: z.number().int().positive(),
+    rows: z.number().int().positive(),
+    /** Placement rectangle before rotation (mm, bottom-left corner). */
+    x: finite,
+    y: finite,
+    w: positive,
+    h: positive,
+    rotation: finite.optional(),
+    height: finite,
+    mode: combineModeSchema,
+  }),
+  /**
    * Sweep a cross-section (an open vector: ends on the base, height measured
    * from the line between its ends) along a rail vector. With `endSection`
    * the shape blends from one to the other along the rail.

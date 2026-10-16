@@ -64,6 +64,8 @@ export interface ReliefForm {
   smoothRadius: number;
   factor: number;
   imageHeight: number;
+  /** Height of a pasted starter clip, mm. */
+  clipHeight: number;
   /** Shapes picked for sweeps (vector ids). */
   rail?: string;
   railB?: string;
@@ -88,6 +90,7 @@ export const DEFAULT_RELIEF_FORM: ReliefForm = {
   smoothRadius: 1,
   factor: 0.5,
   imageHeight: 4,
+  clipHeight: 3,
   sweepScaleHeight: false,
   texture: 'lines',
   textureSpacing: 4,
@@ -99,7 +102,7 @@ export const DEFAULT_RELIEF_FORM: ReliefForm = {
 };
 
 /** What the right-hand panel shows (picked in the Project tree). */
-export type SidebarTab = 'design' | 'bitmaps' | 'relief' | 'cam';
+export type SidebarTab = 'design' | 'bitmaps' | 'relief' | 'clipart' | 'cam';
 
 export interface UiState {
   tool: ToolName;
@@ -147,6 +150,8 @@ export class EditorStore {
   readonly history: History<Project>;
   /** Grayscale images used by image reliefs, by id (immutable, so outside the undo history). */
   images: Record<string, Uint8Array> = {};
+  /** Clipart height grids used by paste steps, by id (immutable, so outside the undo history). */
+  clips: Record<string, Float32Array> = {};
   /** Vectors copied with Edit › Copy / Cut (kept for this session only). */
   clipboard: Omit<Vector, 'id'>[] = [];
   /** Size of the 2D canvas in CSS px (kept by the canvas; zoom commands use it). */
@@ -212,8 +217,13 @@ export class EditorStore {
   }
 
   /** Replaces the document (open file / new) and resets history and selection. */
-  load(doc: Project, images: Record<string, Uint8Array> = {}): void {
+  load(
+    doc: Project,
+    images: Record<string, Uint8Array> = {},
+    clips: Record<string, Float32Array> = {},
+  ): void {
     this.images = images;
+    this.clips = clips;
     this.#reliefCache.clear();
     this.#ui = {
       ...this.#ui,
@@ -262,7 +272,7 @@ export class EditorStore {
     if (hit?.key === key) return hit;
     let entry: { key: string; grid?: Grid; error?: string };
     try {
-      entry = { key, grid: evaluateRelief(r, this.doc, this.images) };
+      entry = { key, grid: evaluateRelief(r, this.doc, this.images, this.clips) };
     } catch (e) {
       entry = { key, error: (e as Error).message };
     }
@@ -279,7 +289,25 @@ export class EditorStore {
     return id;
   }
 
-  /** Everything File › Save writes: project, relief grids and images. */
+  /**
+   * Stores a clipart height grid and returns its id: `preferred` when that is
+   * free or already holds this same grid (starter clips), else a new clipN.
+   */
+  addClip(z: Float32Array, preferred?: string): string {
+    const same = (a: Float32Array | undefined) =>
+      !!a && a.length === z.length && a.every((v, i) => v === z[i]);
+    if (preferred && (!this.clips[preferred] || same(this.clips[preferred]))) {
+      this.clips[preferred] = this.clips[preferred] ?? z;
+      return preferred;
+    }
+    let n = 1;
+    while (this.clips[`clip${n}`]) n++;
+    const id = `clip${n}`;
+    this.clips[id] = z;
+    return id;
+  }
+
+  /** Everything File › Save writes: project, relief grids, images and clipart. */
   bundle(): ProjectBundle {
     const reliefData: Record<string, Float32Array> = {};
     for (const r of this.doc.reliefs) {
@@ -291,7 +319,11 @@ export class EditorStore {
       ),
     );
     const images = Object.fromEntries(Object.entries(this.images).filter(([k]) => used.has(k)));
-    return { project: this.doc, reliefData, images };
+    const usedClips = new Set(
+      this.doc.reliefs.flatMap((r) => r.ops.flatMap((o) => (o.op === 'paste' ? [o.clip] : []))),
+    );
+    const clips = Object.fromEntries(Object.entries(this.clips).filter(([k]) => usedClips.has(k)));
+    return { project: this.doc, reliefData, images, clips };
   }
 
   /** Notifies listeners without changing anything (derived data arrived). */

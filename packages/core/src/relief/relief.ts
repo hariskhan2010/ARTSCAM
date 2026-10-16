@@ -255,19 +255,84 @@ export class ReliefError extends Error {
 /** Grayscale image bytes by image id (images/<id>.gray in the project zip). */
 export type ReliefImages = Readonly<Record<string, Uint8Array>>;
 
+/** Clipart height grids by clip id (clips/<id>.f32 in the project zip). */
+export type ReliefClips = Readonly<Record<string, Float32Array>>;
+
 /** Rebuilds a relief's height grid from its ops. */
-export function evaluateRelief(relief: Relief, project: Project, images: ReliefImages = {}): Grid {
+export function evaluateRelief(
+  relief: Relief,
+  project: Project,
+  images: ReliefImages = {},
+  clips: ReliefClips = {},
+): Grid {
   const g: Grid = {
     cols: relief.cols,
     rows: relief.rows,
     resolution: relief.resolution,
     z: new Float32Array(relief.cols * relief.rows),
   };
-  for (const op of relief.ops) applyOp(g, op, project, images);
+  for (const op of relief.ops) applyOp(g, op, project, images, clips);
   return g;
 }
 
-export function applyOp(g: Grid, op: ReliefOp, project: Project, images: ReliefImages = {}): void {
+/** Height grid (row 0 at the bottom) sampled bilinearly at u, v ∈ [0, 1]. */
+function sampleClip(z: Float32Array, w: number, h: number, u: number, v: number): number {
+  const x = Math.min(w - 1, Math.max(0, u * w - 0.5));
+  const y = Math.min(h - 1, Math.max(0, v * h - 0.5));
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = Math.min(w - 1, x0 + 1);
+  const y1 = Math.min(h - 1, y0 + 1);
+  const fx = x - x0;
+  const fy = y - y0;
+  const at = (xx: number, yy: number) => z[yy * w + xx] as number;
+  return (
+    (at(x0, y0) * (1 - fx) + at(x1, y0) * fx) * (1 - fy) +
+    (at(x0, y1) * (1 - fx) + at(x1, y1) * fx) * fy
+  );
+}
+
+/** Places a clip on the grid: its rectangle, turned about the centre, scaled to `height`. */
+function applyPaste(g: Grid, op: Extract<ReliefOp, { op: 'paste' }>, clips: ReliefClips) {
+  const clip = clips[op.clip];
+  if (!clip || clip.length !== op.cols * op.rows)
+    throw new ReliefError(`Missing clipart "${op.clip}"`);
+  const { max } = gridRange(clip);
+  if (!(max > 0)) return; // a flat clip adds nothing
+  const k = op.height / max;
+  const res = g.resolution;
+  const cx = op.x + op.w / 2;
+  const cy = op.y + op.h / 2;
+  const a = ((op.rotation ?? 0) * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  // Cells under the turned rectangle's bounding box.
+  const ex = (Math.abs(cos) * op.w + Math.abs(sin) * op.h) / 2;
+  const ey = (Math.abs(sin) * op.w + Math.abs(cos) * op.h) / 2;
+  const c0 = Math.max(0, Math.floor((cx - ex) / res));
+  const c1 = Math.min(g.cols - 1, Math.ceil((cx + ex) / res));
+  const r0 = Math.max(0, Math.floor((cy - ey) / res));
+  const r1 = Math.min(g.rows - 1, Math.ceil((cy + ey) / res));
+  for (let r = r0; r <= r1; r++) {
+    const dy = (r + 0.5) * res - cy;
+    for (let c = c0; c <= c1; c++) {
+      const dx = (c + 0.5) * res - cx;
+      // Into the clip's own frame: turn back by the rotation.
+      const u = (dx * cos + dy * sin) / op.w + 0.5;
+      const v = (-dx * sin + dy * cos) / op.h + 0.5;
+      if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+      combineAt(g.z, r * g.cols + c, k * sampleClip(clip, op.cols, op.rows, u, v), op.mode);
+    }
+  }
+}
+
+export function applyOp(
+  g: Grid,
+  op: ReliefOp,
+  project: Project,
+  images: ReliefImages = {},
+  clips: ReliefClips = {},
+): void {
   const { z, cols, rows, resolution: res } = g;
   switch (op.op) {
     case 'fromVector': {
@@ -311,6 +376,9 @@ export function applyOp(g: Grid, op: ReliefOp, project: Project, images: ReliefI
       }
       return;
     }
+    case 'paste':
+      applyPaste(g, op, clips);
+      return;
     case 'extrude':
     case 'spin':
     case 'twoRail': {
