@@ -771,6 +771,8 @@ export const TOOLPATH_LABEL: Record<Toolpath['type'], string> = {
   pocket: 'Pocket',
   vcarve: 'V-carve',
   drill: 'Drill',
+  fluting: 'Fluting',
+  chamfer: 'Chamfer',
   rough3d: '3D rough',
   finish3d: '3D finish',
 };
@@ -783,15 +785,21 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
   // V-carving needs a V-bit: use one from the library when the active tool is not.
   // Each job prefers the tool type it needs when the library has one.
   const want =
-    type === 'vcarve'
+    type === 'vcarve' || type === 'chamfer'
       ? 'vbit'
       : type === 'finish3d'
         ? 'ballnose'
         : type === 'rough3d'
           ? 'flat'
           : undefined;
+  // Fluting takes a ball nose or a V-bit (or a tapered ball).
+  const fluteTool =
+    type === 'fluting' && active?.type === 'flat'
+      ? (doc.tools.find((t) => t.type === 'ballnose') ?? doc.tools.find((t) => t.type === 'vbit'))
+      : undefined;
   const tool =
-    want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active;
+    fluteTool ??
+    (want && active?.type !== want ? (doc.tools.find((t) => t.type === want) ?? active) : active);
   const relief = activeRelief(store);
   const is3d = type === 'rough3d' || type === 'finish3d';
   if (!tool) {
@@ -814,14 +822,23 @@ export function createToolpath(store: EditorStore, type: Toolpath['type']): void
         ? { depth, strategy: 'offset' as const }
         : type === 'vcarve'
           ? { depth: Math.min(6, doc.stock.thickness) }
-          : type === 'rough3d'
-            ? { allowance: 0.5 }
-            : type === 'finish3d'
-              ? { pattern: 'x' as const }
-              : { depth };
-  if (type === 'vcarve' && tool.type !== 'vbit') {
+          : type === 'fluting'
+            ? { depth, rampIn: 10, rampOut: 10 }
+            : type === 'chamfer'
+              ? { width: 2, side: 'outside' as const }
+              : type === 'rough3d'
+                ? { allowance: 0.5 }
+                : type === 'finish3d'
+                  ? { pattern: 'x' as const }
+                  : { depth };
+  if ((type === 'vcarve' || type === 'chamfer') && tool.type !== 'vbit') {
     store.setUi({
-      message: 'V-carving needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)',
+      message: `${type === 'vcarve' ? 'V-carving' : 'A chamfer'} needs a V-bit: add one in the Tools section (e.g. 60° or 90° V-bit)`,
+    });
+  }
+  if (type === 'fluting' && tool.type === 'flat') {
+    store.setUi({
+      message: 'Fluting needs a ball nose or a V-bit: add one in the Tools section',
     });
   }
   const name = `${TOOLPATH_LABEL[type]} ${doc.toolpaths.filter((t) => t.type === type).length + 1}`;

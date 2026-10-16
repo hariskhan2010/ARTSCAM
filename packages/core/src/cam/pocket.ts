@@ -1,6 +1,14 @@
 import type { Tool, Toolpath, Vector } from '../model/schema';
-import { clipLines, normalize, offset, simplify, type Region } from '../vector/clip';
-import { flatten } from '../vector/flatten';
+import {
+  booleanOp,
+  clipLines,
+  normalize,
+  offset,
+  regionArea,
+  simplify,
+  type Region,
+} from '../vector/clip';
+import { flatten, signedArea } from '../vector/flatten';
 import { applyMatrix, rotation, type Vec2 } from '../vector/path';
 import { PathBuilder, cutContour, passDepths } from './builder';
 
@@ -9,6 +17,10 @@ import { PathBuilder, cutContour, passDepths } from './builder';
  * to a depth. Vectors inside other vectors are islands (even-odd per vector,
  * union across vectors). Strategies: concentric offsets (centre outward), or
  * zig-zag raster lines followed by a finishing pass around the walls.
+ *
+ * Rest machining (T6.12): after a larger tool has cleared the pocket, a
+ * smaller one cuts only where the larger one could not reach (the corners
+ * and narrow gaps).
  */
 
 export type PocketParams = Extract<Toolpath, { type: 'pocket' }>['params'];
@@ -143,16 +155,118 @@ export function pocketPieces(
   return pieces;
 }
 
+/**
+ * Reach of a larger tool is grown by this much (mm) so that walls it did
+ * reach leave no hairline slivers to clean up.
+ */
+const REST_SLACK = 0.01;
+/** Rest areas smaller than this (mm²) are rounding noise. */
+const REST_MIN_AREA = 1e-3;
+
+/**
+ * The part of `region` a round tool of radius `bigR` cannot reach: the
+ * region minus its morphological opening (inset by bigR, then outset by bigR).
+ */
+export function restRegion(region: Region, bigR: number): Region {
+  const reached = offset(offset(region, -bigR), bigR + REST_SLACK);
+  const rest = booleanOp('difference', region, reached);
+  return rest.length && regionArea(rest) > REST_MIN_AREA ? rest : [];
+}
+
+/**
+ * Tool-centre region for rest machining: centres of the small tool (radius
+ * r) whose cut touches what the larger tool (radius bigR) left behind.
+ */
+export function restCentres(
+  region: Region,
+  centres: Region,
+  r: number,
+  bigR: number,
+  allowance = 0,
+): Region {
+  const target = allowance > 0 ? offset(region, -allowance) : region;
+  const rest = restRegion(target, bigR);
+  if (rest.length === 0) return [];
+  const out = booleanOp('intersect', centres, offset(rest, r));
+  return out.length && regionArea(out) > REST_MIN_AREA ? out : [];
+}
+
+/** Even-odd point-in-ring test. */
+function insideRing(p: Vec2, ring: readonly Vec2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i] as Vec2;
+    const c = ring[j] as Vec2;
+    if (
+      a[1] > p[1] !== c[1] > p[1] &&
+      p[0] < a[0] + ((p[1] - a[1]) * (c[0] - a[0])) / (c[1] - a[1])
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+/** Splits a region into separate areas: each outer ring with the holes inside it. */
+export function separateAreas(region: Region): Region[] {
+  const outers = region.filter((r) => signedArea(r) > 0);
+  const areas: Region[] = outers.map((r) => [r]);
+  for (const hole of region.filter((r) => signedArea(r) <= 0)) {
+    // The smallest outer ring around the hole owns it.
+    let best = -1;
+    outers.forEach((o, i) => {
+      if (
+        insideRing(hole[0] as Vec2, o) &&
+        (best < 0 || signedArea(o) < signedArea(outers[best] as Vec2[]))
+      )
+        best = i;
+    });
+    if (best >= 0) (areas[best] as Region).push(hole);
+  }
+  return areas;
+}
+
 export function emitPocket(
   b: PathBuilder,
   region: Region,
   tool: Pick<Tool, 'diameter' | 'stepDown' | 'stepOver'>,
   params: PocketParams,
   warnings: string[],
+  /** The larger tool used first (rest machining), when `params.restFrom` is set. */
+  restTool?: Pick<Tool, 'diameter'>,
 ): void {
-  const centres = offset(region, -(tool.diameter / 2 + (params.allowance ?? 0)));
+  const allowance = params.allowance ?? 0;
+  let centres = offset(region, -(tool.diameter / 2 + allowance));
   if (centres.length === 0) {
     if (region.length) warnings.push('The tool is too large to fit inside the pocket; nothing cut');
+    return;
+  }
+  if (restTool) {
+    if (restTool.diameter <= tool.diameter + 1e-9) {
+      warnings.push(
+        'Clean corners after: the first tool is not larger than this one, so there is nothing left for this one to reach; nothing cut',
+      );
+      return;
+    }
+    centres = restCentres(region, centres, tool.diameter / 2, restTool.diameter / 2, allowance);
+    if (centres.length === 0) {
+      if (region.length) warnings.push('The first tool reaches the whole pocket; nothing to clean');
+      return;
+    }
+    // The leftovers are separate corners and gaps: finish each one to full
+    // depth before moving on, nearest next.
+    const depths = passDepths(b.topZ, params.depth, tool.stepDown);
+    const left = separateAreas(centres);
+    while (left.length) {
+      const from = b.xy ?? [0, 0];
+      let next = 0;
+      left.forEach((area, i) => {
+        const p = (area[0] as Vec2[])[0] as Vec2;
+        const q = ((left[next] as Region)[0] as Vec2[])[0] as Vec2;
+        if (Math.hypot(p[0] - from[0], p[1] - from[1]) < Math.hypot(q[0] - from[0], q[1] - from[1]))
+          next = i;
+      });
+      emitPocketCentres(b, left.splice(next, 1)[0] as Region, tool, params, depths);
+    }
     return;
   }
   emitPocketCentres(b, centres, tool, params, passDepths(b.topZ, params.depth, tool.stepDown));

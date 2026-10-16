@@ -2,9 +2,11 @@ import {
   AVAILABLE_POSTS,
   TOOL_PRESETS,
   addTool,
+  chamferDepth,
   deleteTool,
   deleteToolpath,
   formatDuration,
+  formatLength,
   setMachine,
   toolLabel,
   toolProblems,
@@ -16,6 +18,7 @@ import {
 } from '@naqsh/core';
 import {
   CircleDot,
+  Columns3,
   Cpu,
   Download,
   Drill,
@@ -24,6 +27,7 @@ import {
   ScanLine,
   SquareDashed,
   Triangle,
+  TriangleRight,
   Wrench,
   Layers3,
   Waves,
@@ -51,6 +55,12 @@ const TYPE_INFO: Record<Toolpath['type'], { label: string; icon: typeof Route; t
   pocket: { label: 'Pocket', icon: SquareDashed, text: 'Clear the area inside shapes' },
   vcarve: { label: 'V-carve', icon: Triangle, text: 'Carve lettering and art with a V-bit' },
   drill: { label: 'Drill', icon: Drill, text: 'Drill a hole at each shape’s centre' },
+  fluting: {
+    label: 'Fluting',
+    icon: Columns3,
+    text: 'Grooves along lines that taper in and out at the ends',
+  },
+  chamfer: { label: 'Chamfer', icon: TriangleRight, text: 'Bevel the edge of shapes with a V-bit' },
   rough3d: { label: '3D rough', icon: Layers3, text: 'Clear material above a relief in steps' },
   finish3d: { label: '3D finish', icon: Waves, text: 'Follow the relief surface with a ball nose' },
 };
@@ -194,7 +204,10 @@ function PresetPicker({ store }: { store: EditorStore }) {
 function ToolsSection({ store }: { store: EditorStore }) {
   const doc = store.doc;
   const active = doc.tools.find((t) => t.id === store.ui.activeTool) ?? doc.tools[0];
-  const inUse = (id: string) => doc.toolpaths.some((tp) => tp.tool === id);
+  const inUse = (id: string) =>
+    doc.toolpaths.some(
+      (tp) => tp.tool === id || (tp.type === 'pocket' && tp.params.restFrom === id),
+    );
   return (
     <Section title="Tools" icon={Wrench} collapsible defaultOpen={doc.tools.length === 0}>
       {doc.tools.length === 0 && (
@@ -415,6 +428,103 @@ function ParamsEditor({ store, tp }: { store: EditorStore; tp: Toolpath }) {
               />
             )}
           </div>
+          {direction(p.direction, (d) => set({ direction: d }))}
+          <SelectField
+            label="Clean corners after"
+            value={p.restFrom ?? ''}
+            testId="tp-rest-from"
+            help="Pick the larger tool that cleared this pocket first: this toolpath then only cuts the corners and gaps it could not reach"
+            options={[
+              { value: '', label: 'No: clear the whole pocket' },
+              ...store.doc.tools
+                .filter((t) => t.id !== tp.tool)
+                .map((t) => ({ value: t.id, label: toolLabel(t, u) })),
+            ]}
+            onChange={(id) => set(id ? { restFrom: id } : { restFrom: undefined })}
+          />
+        </>
+      );
+    }
+    case 'fluting': {
+      const p = tp.params;
+      const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
+      return (
+        <>
+          <div className="grid2">
+            {depth}
+            <NumberField
+              label="Ramp in"
+              units={u}
+              min={0}
+              value={p.rampIn}
+              testId="tp-ramp-in"
+              help="Distance from the start over which the tool sinks to full depth"
+              onCommit={(rampIn) => set({ rampIn })}
+            />
+            <NumberField
+              label="Ramp out"
+              units={u}
+              min={0}
+              value={p.rampOut}
+              testId="tp-ramp-out"
+              help="Distance before the end over which the tool rises back to the surface"
+              onCommit={(rampOut) => set({ rampOut })}
+            />
+          </div>
+          <Segmented
+            label="Ramp shape"
+            value={p.shape ?? 'linear'}
+            options={[
+              { value: 'linear', label: 'Straight', help: 'An even slope' },
+              { value: 'smooth', label: 'Smooth', help: 'Eases in and out of the slope' },
+            ]}
+            onChange={(shape) => set({ shape })}
+          />
+          <Hint>
+            Use a ball nose or a V-bit. The flute follows each shape from its start point.
+          </Hint>
+        </>
+      );
+    }
+    case 'chamfer': {
+      const p = tp.params;
+      const set = (patch: Partial<typeof p>) => save({ ...tp, params: { ...p, ...patch } });
+      const tool = store.doc.tools.find((t) => t.id === tp.tool);
+      return (
+        <>
+          <Segmented
+            label="Bevel"
+            testId="tp-side"
+            value={p.side}
+            options={[
+              {
+                value: 'outside',
+                label: 'Outside',
+                help: 'The bevel slopes down away from the line, outside the shape',
+              },
+              {
+                value: 'inside',
+                label: 'Inside',
+                help: 'The bevel slopes down away from the line, inside the shape',
+              },
+            ]}
+            onChange={(side) => set({ side })}
+          />
+          <NumberField
+            label="Width"
+            units={u}
+            min={0.01}
+            value={p.width}
+            testId="tp-chamfer-width"
+            help="Width of the bevel on the top of the material, starting at the line"
+            onCommit={(width) => set({ width })}
+          />
+          {tool?.type === 'vbit' && (
+            <Hint>
+              Cuts {formatLength(chamferDepth(tool, p.width), u)} deep with this {tool.angle ?? 90}°
+              V-bit.
+            </Hint>
+          )}
           {direction(p.direction, (d) => set({ direction: d }))}
         </>
       );

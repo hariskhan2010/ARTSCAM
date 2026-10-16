@@ -6,6 +6,7 @@ import { parseGcode } from '../gcode/parser';
 import {
   addRelief,
   addTool,
+  deleteTool,
   addToolpath,
   addVectors,
   newProject,
@@ -16,16 +17,18 @@ import {
 import { loadProject, saveProject } from '../model/projectFile';
 import { projectSchema, toolSchema, type Project } from '../model/schema';
 import { postGrbl } from '../post/grbl';
-import { createHeightmap, simulate } from '../sim/heightmap';
+import { createHeightmap, simulate, type Heightmap } from '../sim/heightmap';
 import { estimateTime, formatDuration, trapezoidTime } from '../sim/time';
 import { booleanOp, offset, regionArea } from '../vector/clip';
 import { flatten, signedArea } from '../vector/flatten';
 import { translation, type Vec2 } from '../vector/path';
 import { ellipse, line, rectangle } from '../vector/shapes';
 import { passDepths, tabSpans } from './builder';
+import { chamferDepth } from './chamfer';
+import { easeRamp, fluteDepth, fluteRamps } from './fluting';
 import { exportToolpath, toolpathKey } from './export';
 import { generateToolpath } from './generate';
-import { pocketRegion } from './pocket';
+import { pocketRegion, restRegion } from './pocket';
 import { TOOL_PRESETS, heightAt, radiusAt, toolLabel, toolProblems } from './tools';
 
 // --- Fixture project ----------------------------------------------------------
@@ -42,10 +45,13 @@ function camProject(units: Project['units'] = 'mm'): Project {
     { id: 'd3', layer: 'L1', closed: true, segments: ellipse(120, 170, 2.5) },
     { id: 'groove', layer: 'L1', closed: false, segments: line([160, 150], [280, 180]) },
     { id: 'vbar', layer: 'L1', closed: true, segments: rectangle(20, 100, 60, 8) },
+    { id: 'flute', layer: 'L1', closed: false, segments: line([90, 130], [150, 130]) },
+    { id: 'bevel', layer: 'L1', closed: true, segments: rectangle(95, 95, 40, 20) },
   ]).apply(p);
   p = addTool({ id: 'em6', ...TOOL_PRESETS[3]! }).apply(p); // 6 mm flat
   p = addTool({ id: 'em3', ...TOOL_PRESETS[2]! }).apply(p); // 3 mm flat
   p = addTool({ id: 'v90', ...TOOL_PRESETS[7]! }).apply(p); // 90° V-bit
+  p = addTool({ id: 'ball6', ...TOOL_PRESETS[5]! }).apply(p); // 6 mm ball nose
   const tps: NewToolpath[] = [
     {
       id: 'cutout',
@@ -107,6 +113,30 @@ function camProject(units: Project['units'] = 'mm'): Project {
       tool: 'v90',
       vectors: ['groove'],
       params: { side: 'on', depth: 3 },
+    },
+    {
+      id: 'fluting',
+      name: 'Flute',
+      type: 'fluting',
+      tool: 'ball6',
+      vectors: ['flute'],
+      params: { depth: 4, rampIn: 15, rampOut: 10 },
+    },
+    {
+      id: 'chamfer',
+      name: 'Chamfer',
+      type: 'chamfer',
+      tool: 'v90',
+      vectors: ['bevel'],
+      params: { width: 2, side: 'outside' },
+    },
+    {
+      id: 'pocket-rest',
+      name: 'Pocket corners',
+      type: 'pocket',
+      tool: 'em3',
+      vectors: ['pocket', 'island'],
+      params: { depth: 5, strategy: 'offset', restFrom: 'em6' },
     },
   ];
   for (const tp of tps) p = addToolpath(tp).apply(p);
@@ -362,6 +392,304 @@ describe('pocket', () => {
       params: { depth: 1, strategy: 'offset' },
     }).apply(p);
     expect(generateToolpath(p, 'x').warnings.join()).toMatch(/too large/);
+  });
+});
+
+// --- Fluting, chamfer, rest machining (T6.12) ---------------------------------------
+
+/** Height of the simulated cell nearest (x, y). */
+const cellZ = (hm: Heightmap, x: number, y: number) => {
+  const c = Math.round((x - hm.x0) / hm.cell);
+  const r = Math.round((y - hm.y0) / hm.cell);
+  return hm.z[r * hm.cols + c]!;
+};
+/** X of the cell centre nearest x (so expectations use the exact sampled point). */
+const cellX = (hm: Heightmap, x: number) => hm.x0 + Math.round((x - hm.x0) / hm.cell) * hm.cell;
+
+/** Exports (checker must pass) and simulates the toolpaths in order on one heightmap. */
+const simulated = (
+  p: Project,
+  ids: string[],
+  cell = 0.25,
+  hm = createHeightmap(p.stock, { cell }),
+) => {
+  for (const id of ids) {
+    const ex = exportToolpath(p, id, { simulated: true });
+    expect(ex.check.issues, id).toEqual([]);
+    simulate(hm, ex.check.program, ex.program.tool);
+  }
+  return hm;
+};
+
+describe('fluting', () => {
+  const params = { depth: 4, rampIn: 15, rampOut: 10 };
+  const L = 60;
+  const ramps = fluteRamps(L, params);
+
+  it('ramps from the surface to full depth and back up before the end', () => {
+    const at = (s: number) => fluteDepth(s, L, params, ramps);
+    expect([0, 7.5, 15, 30, 50, 55, 60].map(at)).toEqual([0, 2, 4, 4, 4, 2, 0]);
+    // Smooth: an S-curve through the same midpoint, gentler at both ends.
+    const smooth = { ...params, shape: 'smooth' as const };
+    expect(fluteDepth(7.5, L, smooth, ramps)).toBeCloseTo(2, 9);
+    expect(fluteDepth(3.75, L, smooth, ramps)).toBeCloseTo(4 * easeRamp(0.25, 'smooth'), 9);
+    expect(easeRamp(0.25, 'smooth')).toBeLessThan(0.25);
+  });
+
+  it('shortens ramps longer than the shape so they meet', () => {
+    const r = fluteRamps(10, { rampIn: 15, rampOut: 5 });
+    expect(r).toEqual({ rampIn: 7.5, rampOut: 2.5, scaled: true });
+    expect(fluteDepth(7.5, 10, { depth: 4 }, r)).toBe(4);
+  });
+
+  it('every move follows the ramp profile, clamped to the depth per pass', () => {
+    const prog = generateToolpath(project, 'fluting');
+    const moves = cutMoves(project, 'fluting');
+    expect(prog.warnings).toEqual([]);
+    for (const m of moves) {
+      expect(m.to[1]).toBe(130);
+      const s = m.to[0] - 90;
+      // On the flute profile, or clamped to the first pass depth (ball nose: 2 mm per pass).
+      const want = -fluteDepth(s, L, params, ramps);
+      expect(m.to[2]).toBeGreaterThanOrEqual(want - 1e-9);
+      expect(
+        [want, -2].some((z) => Math.abs(m.to[2] - z) < 1e-9),
+        `s=${s} z=${m.to[2]}`,
+      ).toBe(true);
+    }
+    expect(Math.min(...moves.map((m) => m.to[2]))).toBe(-4);
+    const firstPass = moves.slice(0, moves.findIndex((m) => m.to[0] === 150) + 1);
+    expect(Math.min(...firstPass.map((m) => m.to[2]))).toBe(-2);
+    // Starts at the surface at the start of the line: no plunge into material.
+    expect(moves[0]!.to).toEqual([90, 130, 0]);
+  });
+
+  it('smooth ramps follow the S-curve within 0.01 mm', () => {
+    const p = structuredClone(project);
+    const tp = p.toolpaths.find((t) => t.id === 'fluting')!;
+    if (tp.type === 'fluting') tp.params.shape = 'smooth';
+    const moves = cutMoves(p, 'fluting');
+    const smooth = { ...params, shape: 'smooth' as const };
+    let checked = 0;
+    for (let i = 1; i < moves.length; i++) {
+      const a = moves[i - 1]!.to;
+      const b = moves[i]!.to;
+      // Last pass only (below the first pass's 2 mm clamp, or on the ramps' upper half).
+      if (a[0] === b[0] || Math.min(a[2], b[2]) <= -2 + 1e-9) continue;
+      const mid = (a[0] + b[0]) / 2 - 90;
+      expect(Math.abs((a[2] + b[2]) / 2 + fluteDepth(mid, L, smooth, ramps))).toBeLessThan(0.011);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+
+  it('simulated groove: full depth in the middle, tapering to nothing at both ends', () => {
+    const hm = simulated(project, ['fluting']);
+    for (const s of [2, 5, 10, 14, 20, 30, 45, 52, 58]) {
+      const x = cellX(hm, 90 + s);
+      const want = -fluteDepth(x - 90, L, params, ramps);
+      const z = cellZ(hm, x, 130);
+      // A ball on a slope k dips below its tip line by up to k²·R/2 (0.11 mm in, 0.24 mm out).
+      const k = s <= 15 ? 4 / 15 : s >= 50 ? 4 / 10 : 0;
+      expect(z, `s=${s}`).toBeLessThanOrEqual(want + 0.02);
+      expect(z, `s=${s}`).toBeGreaterThan(want - (k * k * 3) / 2 - 0.03);
+    }
+    // 6 mm wide at full depth; nothing cut beyond the ends.
+    expect(cellZ(hm, 120, 130 + 2.9)).toBeLessThan(-0.5);
+    expect(cellZ(hm, 120, 130 + 3.2)).toBe(0);
+    expect(cellZ(hm, 86.5, 130)).toBe(0);
+    expect(cellZ(hm, 153.5, 130)).toBe(0);
+  });
+
+  it('a flat end mill is flagged by the tool rule', () => {
+    const p = structuredClone(project);
+    p.toolpaths.find((t) => t.id === 'fluting')!.tool = 'em6';
+    const ex = exportToolpath(p, 'fluting', { simulated: true });
+    expect(ex.ok).toBe(false);
+    expect(ex.check.issues.map((i) => i.rule)).toEqual(['tool']);
+    expect(ex.program.warnings.join()).toMatch(/ball nose or V-bit/);
+  });
+});
+
+describe('chamfer', () => {
+  it('depth = width / tan(½·angle)', () => {
+    expect(chamferDepth({ angle: 90 }, 2)).toBeCloseTo(2, 12);
+    expect(chamferDepth({ angle: 60 }, 2)).toBeCloseTo(2 * Math.sqrt(3), 12);
+  });
+
+  it('tip runs `width` from the line on the chosen side, at the chamfer depth', () => {
+    const moves = cutMoves(project, 'chamfer');
+    // 2 / tan(45°) is 2 within rounding.
+    const deepest = moves.filter((m) => m.to[2] < -2 + 1e-9);
+    const xs = deepest.map((m) => m.to[0]);
+    const ys = deepest.map((m) => m.to[1]);
+    expect(Math.min(...xs)).toBeCloseTo(93, 6);
+    expect(Math.max(...xs)).toBeCloseTo(137, 6);
+    expect(Math.min(...ys)).toBeCloseTo(93, 6);
+    expect(Math.max(...ys)).toBeCloseTo(117, 6);
+    expect(Math.min(...moves.map((m) => m.to[2]))).toBeCloseTo(-2, 12);
+    // Climb on an outside cut: clockwise.
+    expect(signedArea(deepest.map((m): Vec2 => [m.to[0], m.to[1]]))).toBeLessThan(0);
+
+    // Inside, 3 mm wide: tip 3 mm inside the line, 3 mm deep in two 1.5 mm passes.
+    const p = structuredClone(project);
+    const tp = p.toolpaths.find((t) => t.id === 'chamfer')!;
+    if (tp.type === 'chamfer') tp.params = { width: 3, side: 'inside' };
+    const inside = cutMoves(p, 'chamfer');
+    const bottom = inside.filter((m) => m.to[2] < -3 + 1e-9);
+    expect(Math.min(...bottom.map((m) => m.to[0]))).toBeCloseTo(98, 6);
+    expect(Math.max(...bottom.map((m) => m.to[1]))).toBeCloseTo(112, 6);
+    expect([...new Set(inside.map((m) => m.to[2]))].map((z) => z.toFixed(9))).toEqual([
+      '-1.500000000',
+      '-3.000000000',
+    ]);
+  });
+
+  it('simulated bevel starts at the line and falls at 45° to the chamfer depth', () => {
+    const hm = simulated(project, ['chamfer']);
+    // Across the left edge (line at x = 95), at mid-height of the shape.
+    for (const x0 of [96, 95.2, 94.6, 94, 93.4, 93]) {
+      const x = cellX(hm, x0);
+      const want = Math.min(0, -(95 - x)); // 90° bit: depth = distance outside the line
+      expect(cellZ(hm, x, 105), `x=${x}`).toBeCloseTo(want, 1);
+    }
+    // The far flank of the V rises again, to the surface 2·width from the line.
+    const x = cellX(hm, 92);
+    expect(cellZ(hm, x, 105)).toBeCloseTo(-(x - 91), 1);
+    expect(cellZ(hm, 90.5, 105)).toBe(0);
+  });
+
+  it('a flat end mill is flagged by the tool rule', () => {
+    const p = structuredClone(project);
+    p.toolpaths.find((t) => t.id === 'chamfer')!.tool = 'em6';
+    const ex = exportToolpath(p, 'chamfer', { simulated: true });
+    expect(ex.ok).toBe(false);
+    expect(ex.check.issues.map((i) => i.rule)).toEqual(['tool']);
+    expect(ex.program.warnings.join()).toMatch(/needs a V-bit/);
+  });
+});
+
+describe('pocket rest machining', () => {
+  const corners: Vec2[] = [
+    [160, 20],
+    [280, 20],
+    [280, 120],
+    [160, 120],
+  ];
+  const nearCorner = (x: number, y: number) =>
+    Math.min(...corners.map(([cx, cy]) => Math.hypot(x - cx, y - cy)));
+
+  it('the rest region of a square is only its four corners', () => {
+    const sq: Vec2[][] = [
+      [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+        [0, 100],
+      ],
+    ];
+    const rest = restRegion(sq, 3);
+    expect(rest).toHaveLength(4);
+    // Each corner: a 3 × 3 square minus a quarter disc of radius 3.
+    expect(regionArea(rest)).toBeCloseTo(4 * 9 * (1 - Math.PI / 4), 0);
+    const d = ([x, y]: Vec2) =>
+      Math.min(
+        Math.hypot(x, y),
+        Math.hypot(100 - x, y),
+        Math.hypot(x, 100 - y),
+        Math.hypot(100 - x, 100 - y),
+      );
+    for (const ring of rest) for (const pt of ring) expect(d(pt)).toBeLessThan(3 + 1e-3);
+    // A round pocket leaves nothing: the big tool reaches all of a convex boundary.
+    const disc = flatten(ellipse(0, 0, 20), 0.005, true).map((p) => p.points);
+    expect(restRegion(disc, 3)).toEqual([]);
+  });
+
+  it('cuts only near the corners the 6 mm tool could not reach', () => {
+    const moves = cutMoves(project, 'pocket-rest');
+    expect(moves.length).toBeGreaterThan(8);
+    // Small tool radius 1.5 + big radius 3, plus a little for the offset arcs.
+    for (const m of moves) expect(nearCorner(m.to[0], m.to[1])).toBeLessThan(4.6);
+    // Every corner is reached, at full depth, in 1.5 mm passes.
+    for (const [cx, cy] of corners)
+      expect(moves.some((m) => Math.hypot(m.to[0] - cx, m.to[1] - cy) < 2.2)).toBe(true);
+    expect(new Set(moves.map((m) => m.to[2]))).toEqual(new Set(passDepths(0, 5, 1.5)));
+  });
+
+  it('simulated: the corners left by the big tool are cleared by the small one', () => {
+    let p = newProject({
+      stock: { width: 60, height: 60, thickness: 10, origin: 'bottom-left', zZero: 'top' },
+    });
+    p = addVectors([
+      { id: 'sq', layer: 'L1', closed: true, segments: rectangle(10, 10, 40, 40) },
+    ]).apply(p);
+    p = addTool({ id: 'big', ...TOOL_PRESETS[3]! }).apply(p); // 6 mm flat
+    p = addTool({ id: 'small', ...TOOL_PRESETS[2]! }).apply(p); // 3 mm flat
+    p = addToolpath({
+      id: 'clear',
+      type: 'pocket',
+      tool: 'big',
+      vectors: ['sq'],
+      params: { depth: 3, strategy: 'offset' },
+    }).apply(p);
+    p = addToolpath({
+      id: 'rest',
+      type: 'pocket',
+      tool: 'small',
+      vectors: ['sq'],
+      params: { depth: 3, strategy: 'offset', restFrom: 'big' },
+    }).apply(p);
+    p = projectSchema.parse(p);
+
+    // Cells within 4 mm of a corner that a 3 mm tool can reach (with a cell of slack):
+    // inside the square, outside the 1.5 mm radius it leaves in the very corner.
+    const target = (x: number, y: number) => {
+      const u = Math.abs(x - 30);
+      const v = Math.abs(y - 30);
+      return (
+        Math.max(u, v) <= 20 - 0.3 &&
+        Math.min(u, v) >= 16 &&
+        Math.hypot(Math.max(0, u - 18.5), Math.max(0, v - 18.5)) <= 1.5 - 0.3
+      );
+    };
+    const count = (hm: Heightmap) => {
+      let cells = 0;
+      let uncut = 0;
+      for (let r = 0; r < hm.rows; r++)
+        for (let c = 0; c < hm.cols; c++) {
+          if (!target(hm.x0 + c * hm.cell, hm.y0 + r * hm.cell)) continue;
+          cells++;
+          if (hm.z[r * hm.cols + c]! > -3 + 1e-3) uncut++;
+        }
+      return { cells, uncut };
+    };
+    const hm = simulated(p, ['clear'], 0.1);
+    const before = count(hm);
+    expect(before.uncut).toBeGreaterThan(50); // the big tool leaves the corners
+    simulated(p, ['rest'], 0.1, hm);
+    expect(count(hm)).toEqual({ cells: before.cells, uncut: 0 });
+    let gouged = 0;
+    for (const z of hm.z) if (z < -3 - 1e-3) gouged++;
+    expect(gouged).toBe(0);
+    // Outside the pocket the material is untouched.
+    expect(cellZ(hm, 9.7, 30)).toBe(0);
+    expect(cellZ(hm, 9.7, 9.7)).toBe(0);
+  });
+
+  it('warns when the first tool is not larger; the first tool cannot be deleted', () => {
+    const p = structuredClone(project);
+    const tp = p.toolpaths.find((t) => t.id === 'pocket-rest')!;
+    if (tp.type === 'pocket') tp.params.restFrom = 'em3';
+    expect(generateToolpath(p, 'pocket-rest').warnings.join()).toMatch(/not larger/);
+
+    let q = structuredClone(project);
+    q = { ...q, toolpaths: q.toolpaths.filter((t) => t.tool !== 'em6') };
+    expect(deleteTool('em6').apply(q)).toBe(q); // still the rest pass's first tool
+
+    const bad = structuredClone(project);
+    const r = bad.toolpaths.find((t) => t.id === 'pocket-rest')!;
+    if (r.type === 'pocket') r.params.restFrom = 'nope';
+    expect(projectSchema.safeParse(bad).success).toBe(false);
   });
 });
 
