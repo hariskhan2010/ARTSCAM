@@ -3,6 +3,7 @@ import {
   Box,
   Circle,
   ClipboardPaste,
+  Columns3,
   Copy,
   Crosshair,
   Download,
@@ -46,6 +47,7 @@ import {
   SquaresUnite,
   Star,
   Triangle,
+  TriangleRight,
   Type,
   Undo2,
   Waves,
@@ -121,6 +123,8 @@ const TOOL_ICON: Record<Toolpath['type'], IconItem['icon']> = {
   pocket: SquareDashed,
   vcarve: Triangle,
   drill: Drill,
+  fluting: Columns3,
+  chamfer: TriangleRight,
   rough3d: Layers3,
   finish3d: Waves,
 };
@@ -320,7 +324,16 @@ export function zoomItems(store: EditorStore, prefix: string): IconItem[] {
 
 /** Row 2: view, relief and toolpath tools. */
 export function toolbarRow2(store: EditorStore): IconEntry[] {
-  const tps: Toolpath['type'][] = ['profile', 'pocket', 'vcarve', 'drill', 'rough3d', 'finish3d'];
+  const tps: Toolpath['type'][] = [
+    'profile',
+    'pocket',
+    'vcarve',
+    'drill',
+    'fluting',
+    'chamfer',
+    'rough3d',
+    'finish3d',
+  ];
   const hasRelief = store.doc.reliefs.length > 0;
   return [
     ...zoomItems(store, 'tb-'),
@@ -492,7 +505,16 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
     checked: ui.tool === id,
     onClick: () => setTool(store, id),
   });
-  const tps: Toolpath['type'][] = ['profile', 'pocket', 'vcarve', 'drill', 'rough3d', 'finish3d'];
+  const tps: Toolpath['type'][] = [
+    'profile',
+    'pocket',
+    'vcarve',
+    'drill',
+    'fluting',
+    'chamfer',
+    'rough3d',
+    'finish3d',
+  ];
 
   return [
     {
@@ -720,7 +742,17 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
         },
         'separator',
         { label: 'Tools and machine…', onClick: () => show(store, 'cam') },
-        later('Rest machining'),
+        {
+          label: 'Rest machining…',
+          title: 'Clean up the corners a larger tool could not reach',
+          onClick: () => {
+            show(store, 'cam');
+            store.setUi({
+              message:
+                'Make a pocket with the smaller tool, then set its "Clean corners after" to the larger tool',
+            });
+          },
+        },
         later('Inlay'),
       ],
     },

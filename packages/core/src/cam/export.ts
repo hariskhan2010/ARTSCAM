@@ -80,6 +80,8 @@ export function toolpathKey(project: Project, toolpathId: string): string {
   return JSON.stringify({
     tp,
     tool: project.tools.find((t) => t.id === tp.tool),
+    // Rest machining depends on the larger tool too.
+    restTool: project.tools.find((t) => tp.type === 'pocket' && t.id === tp.params.restFrom),
     vectors: tp.vectors.map((id) => project.vectors.find((v) => v.id === id)),
     relief: 'relief' in tp ? project.reliefs.find((r) => r.id === tp.relief) : undefined,
     reliefVectors:

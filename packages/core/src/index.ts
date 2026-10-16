@@ -22,6 +22,8 @@ export * from './cam/tools';
 export * from './cam/builder';
 export * from './cam/profile';
 export * from './cam/pocket';
+export * from './cam/fluting';
+export * from './cam/chamfer';
 export * from './cam/drill';
 export * from './cam/generate';
 export * from './cam/export';

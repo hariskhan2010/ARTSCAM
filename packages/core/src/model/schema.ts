@@ -259,6 +259,11 @@ export const toolpathSchema = z.discriminatedUnion('type', [
       angle: finite.optional(),
       direction: cutDirection.optional(),
       allowance: nonNegative.optional(),
+      /**
+       * Rest machining: id of a larger tool that cleared this pocket first.
+       * Only the corners and gaps it could not reach are cut.
+       */
+      restFrom: id.optional(),
     }),
   }),
   z.strictObject({
@@ -300,6 +305,37 @@ export const toolpathSchema = z.discriminatedUnion('type', [
       pattern: z.enum(['x', 'y', 'xy']),
       /** Distance between raster lines (mm). Default: the tool's step-over. */
       stepOver: positive.optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('fluting'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      /** Full depth (mm) of the groove between the ramps. */
+      depth: positive,
+      /** Length (mm) along the vector over which the tool sinks from the surface to full depth. */
+      rampIn: nonNegative,
+      /** Length (mm) before the end over which the tool rises back to the surface. */
+      rampOut: nonNegative,
+      /** Ramp profile: a straight slope, or an eased S-curve. Default linear. */
+      shape: z.enum(['linear', 'smooth']).optional(),
+    }),
+  }),
+  z.strictObject({
+    id,
+    name: z.string().optional(),
+    type: z.literal('chamfer'),
+    tool: id,
+    vectors: z.array(id).min(1),
+    params: z.strictObject({
+      /** Bevel width (mm) on the top surface; depth = width / tan(½·angle) of the V-bit. */
+      width: positive,
+      /** The bevel slopes down away from the line on this side. */
+      side: z.enum(['outside', 'inside']),
+      direction: cutDirection.optional(),
     }),
   }),
   z.strictObject({
@@ -395,6 +431,13 @@ export const projectSchema = projectShape.superRefine((p, ctx) => {
   });
   p.toolpaths.forEach((tp, i) => {
     if (!tools.has(tp.tool)) missing(['toolpaths', i, 'tool'], 'tool', tp.tool);
+    if (
+      tp.type === 'pocket' &&
+      tp.params.restFrom !== undefined &&
+      !tools.has(tp.params.restFrom)
+    ) {
+      missing(['toolpaths', i, 'params', 'restFrom'], 'tool', tp.params.restFrom);
+    }
     if ('relief' in tp && !p.reliefs.some((r) => r.id === tp.relief)) {
       missing(['toolpaths', i, 'relief'], 'relief', tp.relief);
     }

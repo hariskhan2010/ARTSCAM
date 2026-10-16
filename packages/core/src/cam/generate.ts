@@ -1,7 +1,9 @@
 import { stockBounds } from '../gcode/checker';
 import type { Project, Toolpath, Vector } from '../model/schema';
 import { PathBuilder } from './builder';
+import { chamferContours, chamferDepth, emitChamfer } from './chamfer';
 import { drillPoints, emitDrill } from './drill';
+import { emitFluting, flutePaths } from './fluting';
 import { emitPocket, pocketRegion } from './pocket';
 import { emitVcarve } from './vcarve';
 import { emitFinish3d, emitRough3d, placeRelief } from './relief3d';
@@ -70,9 +72,15 @@ export function generate(
   const b = new PathBuilder(safeZ, topZ, [bounds.min[0], bounds.min[1]]);
   const warnings: string[] = [];
 
-  if ('depth' in tp.params && tp.params.depth > project.stock.thickness + 1e-9) {
+  const depth =
+    tp.type === 'chamfer'
+      ? chamferDepth(tool, tp.params.width)
+      : 'depth' in tp.params
+        ? tp.params.depth
+        : undefined;
+  if (depth !== undefined && depth > project.stock.thickness + 1e-9) {
     warnings.push(
-      `Depth ${tp.params.depth} mm is deeper than the stock (${project.stock.thickness} mm); the checker will block export`,
+      `Depth ${Math.round(depth * 1000) / 1000} mm is deeper than the stock (${project.stock.thickness} mm); the checker will block export`,
     );
   }
 
@@ -85,8 +93,44 @@ export function generate(
         tp.params,
       );
       break;
-    case 'pocket':
-      emitPocket(b, pocketRegion(vectors, tolerance, warnings), tool, tp.params, warnings);
+    case 'pocket': {
+      const restId = tp.params.restFrom;
+      const restTool =
+        restId === undefined ? undefined : project.tools.find((t) => t.id === restId);
+      if (restId !== undefined && !restTool) {
+        throw new ToolpathError(`Toolpath ${tp.id} cleans up after unknown tool "${restId}"`);
+      }
+      emitPocket(
+        b,
+        pocketRegion(vectors, tolerance, warnings),
+        tool,
+        tp.params,
+        warnings,
+        restTool,
+      );
+      break;
+    }
+    case 'fluting':
+      if (tool.type === 'flat') {
+        warnings.push(
+          `Fluting needs a ball nose or V-bit; ${toolLabel(tool)} will be rejected by the checker`,
+        );
+      }
+      emitFluting(b, flutePaths(vectors, tolerance), tool, tp.params, warnings);
+      break;
+    case 'chamfer':
+      if (tool.type !== 'vbit') {
+        warnings.push(
+          `A chamfer needs a V-bit; ${toolLabel(tool)} will be rejected by the checker`,
+        );
+      }
+      emitChamfer(
+        b,
+        chamferContours(vectors, tp.params, tolerance, warnings),
+        tool,
+        tp.params,
+        warnings,
+      );
       break;
     case 'rough3d':
     case 'finish3d': {

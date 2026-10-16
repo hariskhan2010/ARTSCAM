@@ -22,7 +22,8 @@ export type RuleId =
   | 'tool' // tool type does not suit the operation
   | 'preview'; // not simulated yet
 
-export type Operation = 'profile' | 'pocket' | 'drill' | 'vcarve' | 'rough3d' | 'finish3d';
+export type Operation =
+  'profile' | 'pocket' | 'drill' | 'vcarve' | 'rough3d' | 'finish3d' | 'fluting' | 'chamfer';
 
 export interface CheckContext {
   machine: Pick<Machine, 'travel' | 'maxFeed' | 'safeZ'>;
@@ -58,6 +59,10 @@ export interface CheckResult {
 const TOOLS_FOR: Partial<Record<Operation, readonly Tool['type'][]>> = {
   vcarve: ['vbit'],
   finish3d: ['ballnose', 'taperedball'],
+  // A flute is shaped by a round or pointed tip; a flat end mill cuts a plain slot.
+  fluting: ['ballnose', 'vbit', 'taperedball'],
+  // The bevel is the V-bit's cone.
+  chamfer: ['vbit'],
 };
 
 const EPS = 1e-6;
