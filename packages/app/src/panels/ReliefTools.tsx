@@ -1,10 +1,13 @@
-import { Brush, Grid3x3, Route } from 'lucide-react';
+import { Brush, Grid3x3, Route, Scissors } from 'lucide-react';
 import {
   addExtrude,
   addSpin,
   addTexture,
   addTwoRail,
+  clipRelief,
+  fadeRelief,
   pickSweepShape,
+  scaleReliefInside,
   setReliefForm,
   sweepShape,
   type SweepRole,
@@ -13,8 +16,8 @@ import type { EditorStore, ReliefForm } from '../editor/store';
 import { Btn, Hint, NumberField, Section, Segmented, SelectField, Switch } from './common';
 
 /**
- * Relief panel sections for M6: sweeps (extrude, spin, two-rail), textures and
- * the sculpt brush. Their settings live in the relief form so the menus and
+ * Relief panel sections for M6: sweeps (extrude, spin, two-rail), textures,
+ * the sculpt brush and edits inside a shape (fade, trim, scale). Their settings live in the relief form so the menus and
  * the canvas use the same values.
  */
 
@@ -195,6 +198,68 @@ export function SculptSection({ store }: { store: EditorStore }) {
         pressed={active}
         onClick={() => store.setUi({ tool: active ? 'select' : 'sculpt', show3d: false })}
         testId="sculpt-start"
+        wide
+      />
+    </Section>
+  );
+}
+
+export function EditReliefSection({ store }: { store: EditorStore }) {
+  const f = store.ui.reliefForm;
+  const one =
+    store.ui.selection.length === 1 &&
+    store.doc.vectors.some((v) => v.id === store.ui.selection[0] && v.closed);
+  const hasRelief = store.doc.reliefs.length > 0;
+  const off = !one || !hasRelief;
+  const why = hasRelief ? 'Select one closed shape first' : 'Make a relief first';
+  return (
+    <Section title="Edit relief" icon={Scissors} collapsible defaultOpen={false}>
+      <Hint>
+        These work inside the one selected closed shape. A linear fade runs from its left edge (full
+        height) to its right edge (flat); a radial fade from its centre out to its side.
+      </Hint>
+      <div className="row">
+        <Btn
+          label="Fade linear"
+          disabled={off}
+          onClick={() => fadeRelief(store, 'line')}
+          testId="edit-fade-line"
+          title={off ? why : 'Fade the relief from left to right inside the shape'}
+          wide
+        />
+        <Btn
+          label="Fade radial"
+          disabled={off}
+          onClick={() => fadeRelief(store, 'radial')}
+          testId="edit-fade-radial"
+          title={off ? why : 'Fade the relief from the centre outward inside the shape'}
+          wide
+        />
+      </div>
+      <div className="row">
+        <Btn
+          label="Keep inside"
+          disabled={off}
+          onClick={() => clipRelief(store, 'inside')}
+          testId="edit-keep-inside"
+          title={off ? why : 'Trim the relief to the shape: flatten everything outside it'}
+          wide
+        />
+        <Btn
+          label="Keep outside"
+          disabled={off}
+          onClick={() => clipRelief(store, 'outside')}
+          testId="edit-keep-outside"
+          title={off ? why : 'Flatten the relief inside the shape'}
+          wide
+        />
+      </div>
+      <Btn
+        label={`Scale height × ${f.factor} inside the shape`}
+        disabled={off}
+        onClick={() => scaleReliefInside(store)}
+        testId="edit-scale-inside"
+        title={off ? why : 'Uses the height factor under Whole relief'}
         wide
       />
     </Section>

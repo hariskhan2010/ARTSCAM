@@ -267,6 +267,43 @@ export function evaluateRelief(relief: Relief, project: Project, images: ReliefI
   return g;
 }
 
+/** Cells inside closed vector `id` (`what` names the step in error messages). */
+function shapeMask(g: Grid, project: Project, id: string, what: string): Uint8Array {
+  const v = project.vectors.find((x) => x.id === id);
+  if (!v) throw new ReliefError(`${what} uses unknown vector "${id}"`);
+  if (!v.closed) throw new ReliefError(`${what} needs a closed shape`);
+  return rasterize(
+    flatten(v.segments, Math.min(0.02, g.resolution / 4), true).map((p) => p.points),
+    g,
+  );
+}
+
+/**
+ * Fade (plan.md T6.9): multiplies each height by f, 1 at `from` falling
+ * linearly to 0 at `to` — along the from→to direction for a line fade, with
+ * distance from `from` for a radial one.
+ */
+function applyFade(g: Grid, op: Extract<ReliefOp, { op: 'fade' }>, mask: Uint8Array | undefined) {
+  const [fx, fy] = op.from;
+  const dx = op.to[0] - fx;
+  const dy = op.to[1] - fy;
+  const len2 = dx * dx + dy * dy;
+  if (!(len2 > 0)) throw new ReliefError('A fade needs two different points');
+  const len = Math.sqrt(len2);
+  const { z, cols, rows, resolution: res } = g;
+  for (let r = 0; r < rows; r++) {
+    const y = (r + 0.5) * res - fy;
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (mask && !mask[i]) continue;
+      const x = (c + 0.5) * res - fx;
+      // t: 0 at `from`, 1 at `to`.
+      const t = op.kind === 'line' ? (x * dx + y * dy) / len2 : Math.hypot(x, y) / len;
+      z[i] = (z[i] as number) * Math.min(1, Math.max(0, 1 - t));
+    }
+  }
+}
+
 export function applyOp(g: Grid, op: ReliefOp, project: Project, images: ReliefImages = {}): void {
   const { z, cols, rows, resolution: res } = g;
   switch (op.op) {
@@ -352,9 +389,21 @@ export function applyOp(g: Grid, op: ReliefOp, project: Project, images: ReliefI
     case 'smooth':
       boxBlur(z, cols, rows, op.radius / res, op.passes);
       return;
-    case 'scale':
-      for (let i = 0; i < z.length; i++) z[i] = (z[i] as number) * op.factor;
+    case 'scale': {
+      const mask = op.within ? shapeMask(g, project, op.within, 'Scale') : undefined;
+      for (let i = 0; i < z.length; i++) if (!mask || mask[i]) z[i] = (z[i] as number) * op.factor;
       return;
+    }
+    case 'fade':
+      applyFade(g, op, op.within ? shapeMask(g, project, op.within, 'A fade') : undefined);
+      return;
+    case 'clip': {
+      // Keep one side of the shape, zero the other.
+      const mask = shapeMask(g, project, op.vector, 'Trimming');
+      const keep = op.keep === 'inside' ? 1 : 0;
+      for (let i = 0; i < z.length; i++) if (mask[i] !== keep) z[i] = 0;
+      return;
+    }
     case 'offset':
       for (let i = 0; i < z.length; i++) z[i] = (z[i] as number) + op.amount;
       return;

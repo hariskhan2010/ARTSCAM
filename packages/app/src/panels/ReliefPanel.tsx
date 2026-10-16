@@ -29,7 +29,7 @@ import {
   smoothRelief,
 } from '../actions';
 import { Btn, Hint, NumberField, Section, Segmented, SelectField } from './common';
-import { SculptSection, SweepSection, TextureSection } from './ReliefTools';
+import { EditReliefSection, SculptSection, SweepSection, TextureSection } from './ReliefTools';
 
 type Profile = Extract<ReliefOp, { op: 'fromVector' }>['profile'];
 type Mode = Extract<ReliefOp, { op: 'fromVector' }>['mode'];
@@ -70,8 +70,18 @@ function describe(op: ReliefOp, vectors: Vector[]): string {
       return `Sculpt ${op.tool} · ${op.radius} mm brush${op.tool === 'smooth' ? '' : ` · ${op.strength} mm`}`;
     case 'smooth':
       return `Smooth ${op.radius} mm × ${op.passes}`;
-    case 'scale':
-      return `Scale height × ${op.factor}`;
+    case 'scale': {
+      const n = op.within ? vectors.findIndex((v) => v.id === op.within) + 1 || '?' : undefined;
+      return `Scale height × ${op.factor}${n ? ` · in shape ${n}` : ''}`;
+    }
+    case 'fade': {
+      const n = op.within ? vectors.findIndex((v) => v.id === op.within) + 1 || '?' : undefined;
+      return `Fade (${op.kind === 'line' ? 'linear' : 'radial'})${n ? ` · in shape ${n}` : ''}`;
+    }
+    case 'clip': {
+      const n = vectors.findIndex((v) => v.id === op.vector) + 1 || '?';
+      return op.keep === 'inside' ? `Keep inside shape ${n}` : `Cut out shape ${n}`;
+    }
     case 'offset':
       return `Raise all by ${op.amount} mm`;
     case 'invert':
@@ -254,6 +264,7 @@ export function ReliefPanel({ store }: { store: EditorStore }) {
       <SweepSection store={store} />
       <TextureSection store={store} />
       <SculptSection store={store} />
+      <EditReliefSection store={store} />
 
       <Section title="Whole relief" icon={Box} collapsible defaultOpen={false}>
         <div className="row">
