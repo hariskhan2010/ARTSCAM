@@ -98,7 +98,11 @@ export function reliefOpVectors(op: ReliefOp): string[] {
     case 'twoRail':
       return [op.railA, op.railB, op.section];
     case 'texture':
+    case 'fade':
+    case 'scale':
       return op.within ? [op.within] : [];
+    case 'clip':
+      return [op.vector];
     default:
       return [];
   }
@@ -407,6 +411,8 @@ const RELIEF_OP_LABEL: Record<ReliefOp['op'], string> = {
   sculpt: 'Sculpt',
   smooth: 'Smooth relief',
   scale: 'Scale relief',
+  fade: 'Fade relief',
+  clip: 'Trim relief to a shape',
   offset: 'Offset relief',
   invert: 'Invert relief',
 };

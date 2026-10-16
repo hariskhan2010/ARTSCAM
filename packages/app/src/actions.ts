@@ -700,6 +700,48 @@ export function sculptStroke(store: EditorStore, points: [number, number][]): vo
   });
 }
 
+// --- Relief edits (T6.9) -------------------------------------------------------
+
+/** The one selected closed shape, or a message saying what to select. */
+function oneClosedShape(store: EditorStore): Vector | undefined {
+  const sel = selectedVectors(store);
+  const v = sel.length === 1 ? sel[0] : undefined;
+  if (!v?.closed) {
+    store.setUi({ message: 'Select one closed shape first' });
+    return undefined;
+  }
+  return v;
+}
+
+/**
+ * Fades the relief inside the selected closed shape: a line fade from the
+ * shape's left edge (full height) to its right edge (zero), or a radial fade
+ * from its centre (full height) to its side (zero).
+ */
+export function fadeRelief(store: EditorStore, kind: 'line' | 'radial'): void {
+  if (!needRelief(store)) return;
+  const v = oneClosedShape(store);
+  const b = v && bbox(v.segments);
+  if (!v || !b) return;
+  const midY = (b.minY + b.maxY) / 2;
+  const from: [number, number] = kind === 'line' ? [b.minX, midY] : [(b.minX + b.maxX) / 2, midY];
+  addReliefStep(store, { op: 'fade', from, to: [b.maxX, midY], kind, within: v.id });
+}
+
+/** Zeroes the relief outside (keep 'inside') or inside (keep 'outside') the selected closed shape. */
+export function clipRelief(store: EditorStore, keep: 'inside' | 'outside'): void {
+  if (!needRelief(store)) return;
+  const v = oneClosedShape(store);
+  if (v) addReliefStep(store, { op: 'clip', vector: v.id, keep });
+}
+
+/** Scales heights by the form's factor inside the selected closed shape only. */
+export function scaleReliefInside(store: EditorStore): void {
+  if (!needRelief(store)) return;
+  const v = oneClosedShape(store);
+  if (v) addReliefStep(store, { op: 'scale', factor: store.ui.reliefForm.factor, within: v.id });
+}
+
 export function exportStl(store: EditorStore): void {
   const r = needRelief(store);
   const grid = r ? store.relief(r.id).grid : undefined;

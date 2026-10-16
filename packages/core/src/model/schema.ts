@@ -174,7 +174,31 @@ export const reliefOpSchema = z.discriminatedUnion('op', [
     radius: positive,
     passes: z.number().int().positive().max(20),
   }),
-  z.strictObject({ op: z.literal('scale'), factor: finite }),
+  /**
+   * Fade heights out: × 1 at `from`, falling linearly to × 0 at `to`. line:
+   * along the from→to direction (1 behind `from`, 0 past `to`); radial: with
+   * distance from `from`, 0 at |to − from| and beyond.
+   */
+  z.strictObject({
+    op: z.literal('fade'),
+    from: point,
+    to: point,
+    kind: z.enum(['line', 'radial']),
+    /** Closed shape to limit it to. Default: the whole relief. */
+    within: id.optional(),
+  }),
+  /** Zero every cell on the other side of a closed shape (trim to it, or cut it out). */
+  z.strictObject({
+    op: z.literal('clip'),
+    vector: id,
+    keep: z.enum(['inside', 'outside']),
+  }),
+  z.strictObject({
+    op: z.literal('scale'),
+    factor: finite,
+    /** Closed shape to limit it to. Default: the whole relief. */
+    within: id.optional(),
+  }),
   z.strictObject({ op: z.literal('offset'), amount: finite }),
   z.strictObject({ op: z.literal('invert') }),
 ]);

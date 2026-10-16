@@ -95,6 +95,9 @@ import {
   addSpin,
   addTwoRail,
   addTexture,
+  clipRelief,
+  fadeRelief,
+  scaleReliefInside,
   openSample,
 } from '../actions';
 import type { CamRunner } from '../cam/runner';
@@ -715,6 +718,32 @@ export function menus(store: EditorStore, runner: CamRunner): MenuDef[] {
           },
         },
         { label: 'Texture', onClick: () => reliefStep(store, addTexture) },
+        'separator',
+        {
+          label: 'Fade inside shape',
+          disabled: !hasRelief,
+          onClick: () => reliefStep(store, (s) => fadeRelief(s, 'line')),
+        },
+        {
+          label: 'Radial fade inside shape',
+          disabled: !hasRelief,
+          onClick: () => reliefStep(store, (s) => fadeRelief(s, 'radial')),
+        },
+        {
+          label: 'Trim to shape',
+          disabled: !hasRelief,
+          onClick: () => reliefStep(store, (s) => clipRelief(s, 'inside')),
+        },
+        {
+          label: 'Zero inside shape',
+          disabled: !hasRelief,
+          onClick: () => reliefStep(store, (s) => clipRelief(s, 'outside')),
+        },
+        {
+          label: 'Scale height inside shape',
+          disabled: !hasRelief,
+          onClick: () => reliefStep(store, scaleReliefInside),
+        },
         {
           label: store.ui.reliefSide === 'back' ? 'Front relief' : 'Back relief',
           onClick: () => openReliefSide(store, store.ui.reliefSide === 'back' ? 'front' : 'back'),
